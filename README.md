@@ -52,6 +52,23 @@ python runprompt-agent/agent.py run ./prompts/*.md --project ~/my-project
 - 对照设计文档逐字段检查 API 契约、共享数据、前后端字段、状态枚举
 - 输出结构化 review report（PASS/WARN/FAIL + 文件:行号）
 
+### Convention Extraction — 跨模块约定提取 🆕
+
+`convention-extraction/extract.sh` — 模块验收后，从代码中提取隐式约定，生成快照供下一模块 prompt 使用。
+
+```bash
+# 模块1完成后提取初始快照
+~/mimir-bo/convention-extraction/extract.sh auth ~/my-project
+
+# 模块2完成后更新快照（自动递增版本）
+~/mimir-bo/convention-extraction/extract.sh training ~/my-project
+```
+
+核心特性：
+- 5 个维度：结构、命名、模式、共享接口、基础设施
+- 增量更新：自动检测已有快照并递增版本
+- 200 行以内的紧凑快照，可直接嵌入 prompt
+
 ### Dashboard — 项目状态管理界面
 
 `dashboard/mimir-bo.html` — 单文件 HTML，浏览器打开即用。
@@ -78,6 +95,10 @@ mimir-bo/
 │   ├── review.sh             # Runner 脚本
 │   ├── review-prompt.md      # Review prompt 模板
 │   └── README.md             # 使用说明
+├── convention-extraction/
+│   ├── extract.sh            # Runner 脚本
+│   ├── extraction-prompt.md  # Extraction prompt 模板
+│   └── README.md             # 使用说明
 ├── dashboard/
 │   ├── mimir-bo.html         # 管理界面（单文件）
 │   └── README.md             # Dashboard 使用说明
@@ -93,7 +114,8 @@ mimir-bo/
 v1 (当前)          v2 (进行中)           v3 (愿景)
 人工管理状态    →   AI chat 感知上下文  →  多 Agent 协作
 runprompt-agent     内嵌 Claude chat       自动分解 + 执行 + 审核
-+ review-agent
++ review-agent      + 约定感知
++ convention-extraction
 ```
 
 详见 [ROADMAP.md](./ROADMAP.md)
