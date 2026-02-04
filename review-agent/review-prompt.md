@@ -128,9 +128,31 @@ Use this format:
 - ❌ FAIL: N
 
 ## Findings
+[... all findings ...]
 
-### Check 1: API Contract Alignment
+## Recommended Actions (Priority Order)
+1. [❌ items first, most impactful]
+2. [then ⚠️ items]
+```
 
+### ⚠️ Summary Counting Rules
+
+The Summary section numbers **MUST** be mechanically counted from the Findings section. Do NOT estimate or manually track counts.
+
+**Counting procedure** (do this AFTER writing all findings, BEFORE writing the Summary):
+1. Scan every line in the Findings section
+2. Count lines starting with `- ✅` → that's the PASS count
+3. Count lines starting with `- ⚠️` → that's the WARN count
+4. Count lines starting with `- ❌` → that's the FAIL count
+5. Total checks = PASS + WARN + FAIL
+
+**Common mistake to avoid**: A finding that is initially marked ⚠️ WARN but then explained as "actually consistent" or "not a real issue" should be **downgraded to ✅ PASS**, not left as WARN. If the finding text says "this is actually consistent" or "no real impact", it is a PASS.
+
+### Finding Format
+
+For each individual check item:
+
+```markdown
 #### Endpoint: [METHOD] [path]
 - ✅ URL path matches across design/backend/frontend
 - ❌ Response field mismatch
@@ -139,24 +161,6 @@ Use this format:
   - File: `app/api/v1/tasks.py:42`
   - Impact: Frontend will fail to parse response
   - Suggested fix: Update backend to match design doc schema
-
-[... repeat for each endpoint ...]
-
-### Check 2: Shared Data Consistency
-[... findings ...]
-
-### Check 3: Frontend-Backend Field Alignment
-[... findings ...]
-
-### Check 4: State & Enum Consistency
-[... findings ...]
-
-### Check 5: Test Coverage Sanity
-[... findings ...]
-
-## Recommended Actions (Priority Order)
-1. [❌ items first, most impactful]
-2. [then ⚠️ items]
 ```
 
 ---
@@ -168,3 +172,4 @@ Use this format:
 3. **Be factual** — Report what IS, not what might be. If something looks suspicious but you can't confirm, mark it ⚠️ WARN.
 4. **Design doc is truth** — When design and code disagree, the design doc is the authority. The code should match the design doc, not the other way around.
 5. **Do NOT modify any code** — Your only output is the review report file.
+6. **Summary must match findings** — The PASS/WARN/FAIL counts in the Summary section must exactly match the counts of ✅/⚠️/❌ markers in the Findings section. Write all findings first, then count the markers to produce the summary. A finding you describe as "actually consistent" or "no real impact" is a ✅ PASS, not a ⚠️ WARN.
