@@ -129,11 +129,6 @@ if [ -f "$OUTPUT_PATH" ]; then
     # Show line count
     LINES=$(wc -l < "$OUTPUT_PATH")
     echo "📏 Snapshot size: ${LINES} lines"
-    if [ "$LINES" -gt 200 ]; then
-        echo "⚠️  Warning: Snapshot exceeds 200-line target. Consider trimming details."
-    else
-        echo "✅ Within 200-line target."
-    fi
 else
     echo "⚠️ Convention snapshot not found at expected path: $OUTPUT_PATH"
     echo "   The extractor may have written it to a different location."

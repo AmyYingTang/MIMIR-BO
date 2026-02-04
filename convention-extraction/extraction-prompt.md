@@ -183,14 +183,19 @@ While extracting, if you find **conflicting patterns** within the same codebase 
 
 ## Step 4: Mark Tentative Conventions
 
-If a pattern appears in **only one place** (because only one module exists), mark it as tentative:
+If a pattern appears in **only one module**, mark it as `[tentative]`:
 
 ```yaml
 naming:
   router_functions: "verb_noun — create_user, get_status [tentative: only seen in auth module]"
 ```
 
-As more modules are built, tentative markers are removed once the pattern is confirmed.
+**Rules for tentative markers:**
+- **Add `[tentative]`** when a pattern is only seen in 1 module. This tells prompt generation "follow this pattern but it's not yet confirmed".
+- **Remove `[tentative]`** when the same pattern appears in a 2nd module — it's now a confirmed convention.
+- **When updating an existing snapshot**, actively scan existing entries for `[tentative]` markers. If the current module confirms the pattern, remove the marker. If the current module contradicts it, flag as an inconsistency instead.
+
+This is important: without tentative markers, prompt generation cannot distinguish "established project convention" from "one module's experiment".
 
 ---
 
@@ -227,11 +232,24 @@ Use this format:
 [from Step 3, or "None found"]
 
 ## Change Log
-| Version | After Module | Changes |
+| Version | After Module | Summary |
 |---------|-------------|---------|
-| {{snapshot_version}} | {{module_name}} | [brief description of what was added/changed] |
+| {{snapshot_version}} | {{module_name}} | [ONE sentence summary, ≤15 words] |
 [preserve previous entries if updating existing snapshot]
+
+**Details for {{snapshot_version}}:**
+- Added: [list new keys added]
+- Updated: [list keys that changed]
+- Flagged: [list new inconsistencies found]
 ```
+
+### ⚠️ Change Log Rules
+
+Each version entry has TWO parts:
+1. **Table row**: ONE sentence summary (≤15 words). Example: `"Added Celery patterns, strategy pattern, file download conventions."`
+2. **Details block**: bullet list of specific keys added/updated/flagged. Keep each bullet to key names only, no explanations.
+
+**Common mistake**: stuffing an entire paragraph into the table cell. The table is for scanning; details go in the bullet list below.
 
 ---
 
@@ -239,6 +257,7 @@ Use this format:
 
 1. **Only document what you can verify from actual code** — do NOT guess or infer conventions that aren't clearly established in the codebase.
 2. **Use actual examples** — every convention entry should include real function names, file paths, or code patterns from the project.
-3. **Keep entries concise** — 1-2 lines per convention. The entire snapshot should be under 200 lines.
-4. **Preserve existing entries** — when updating an existing snapshot, keep all previous entries. Add new ones, update changed ones, remove only if a convention was clearly abandoned.
-5. **Do NOT modify any project code** — your only output is the snapshot file.
+3. **Convention vs implementation detail** — only document **reusable patterns** that the next module should follow. Internal function names specific to one module (e.g., `_build_tree()`, `_handle_success()`) are implementation details, NOT conventions. Ask: "Would a developer building a new module need to know this?" If no, leave it out.
+4. **Keep entries concise** — 1-2 lines per convention. The snapshot grows as modules are added; this is expected. Focus on keeping each individual entry brief, not on total line count.
+5. **Preserve existing entries** — when updating an existing snapshot, keep all previous entries. Add new ones, update changed ones, remove only if a convention was clearly abandoned.
+6. **Do NOT modify any project code** — your only output is the snapshot file.
