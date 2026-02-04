@@ -19,16 +19,16 @@ MIMIR 定义了人类与 AI 协作的方法论（菜谱），BO 是让这套方�
 
 ## 当前能力 (v1)
 
-### Agent — 自动化 Prompt 执行器
+### RunPrompt Agent — 自动化 Prompt 执行器
 
-`agent/agent.py` — 调用 Claude Code CLI 顺序执行 Prompt 文件。
+`runprompt-agent/agent.py` — 调用 Claude Code CLI 顺序执行 Prompt 文件。
 
 ```bash
 # 单个文件
-python agent/agent.py run ./01-init.md --project ~/my-project
+python runprompt-agent/agent.py run ./01-init.md --project ~/my-project
 
 # 多个文件（按文件名排序执行）
-python agent/agent.py run ./prompts/*.md --project ~/my-project
+python runprompt-agent/agent.py run ./prompts/*.md --project ~/my-project
 ```
 
 核心特性：
@@ -37,6 +37,20 @@ python agent/agent.py run ./prompts/*.md --project ~/my-project
 - 交互模式标记 `<!-- agent:interactive -->`
 - Fail-fast：任何步骤失败立即停止
 - stream-json 实时输出
+
+### Review Agent — 独立代码审查 🆕
+
+`review-agent/review.sh` — 模块开发完成后，独立对照设计文档检查代码一致性。
+
+```bash
+# 在项目根目录执行
+~/mimir-bo/review-agent/review.sh auth ~/my-project
+```
+
+核心特性：
+- 与写代码的 agent 完全独立的视角
+- 对照设计文档逐字段检查 API 契约、共享数据、前后端字段、状态枚举
+- 输出结构化 review report（PASS/WARN/FAIL + 文件:行号）
 
 ### Dashboard — 项目状态管理界面
 
@@ -57,9 +71,13 @@ python agent/agent.py run ./prompts/*.md --project ~/my-project
 mimir-bo/
 ├── README.md                 # 本文件
 ├── ROADMAP.md                # 演进路线图
-├── agent/
+├── runprompt-agent/
 │   ├── agent.py              # Prompt 执行器 (v0.6)
-│   └── README.md             # Agent 使用说明
+│   └── README.md             # 使用说明
+├── review-agent/
+│   ├── review.sh             # Runner 脚本
+│   ├── review-prompt.md      # Review prompt 模板
+│   └── README.md             # 使用说明
 ├── dashboard/
 │   ├── mimir-bo.html         # 管理界面（单文件）
 │   └── README.md             # Dashboard 使用说明
@@ -74,7 +92,8 @@ mimir-bo/
 ```
 v1 (当前)          v2 (进行中)           v3 (愿景)
 人工管理状态    →   AI chat 感知上下文  →  多 Agent 协作
-agent.py CLI        内嵌 Claude chat       自动分解 + 执行 + 审核
+runprompt-agent     内嵌 Claude chat       自动分解 + 执行 + 审核
++ review-agent
 ```
 
 详见 [ROADMAP.md](./ROADMAP.md)
