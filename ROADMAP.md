@@ -1,8 +1,8 @@
 # MIMIR Build Orchestrator — Roadmap
 
-> **版本**: v0.1  
+> **版本**: v0.2  
 > **创建日期**: 2025-02-03  
-> **最后更新**: 2025-02-03  
+> **最后更新**: 2025-02-05  
 > **当前版本**: BO v1（agent.py v0.6 + localStorage 管理界面）
 
 ---
@@ -59,6 +59,31 @@ agent.py CLI        内嵌 Claude chat       自动分解 + 自动执行 + 人�
 
 ---
 
+## v1.2 — 多报告 Triage 流程（待设计）
+
+> 核心目标：报告与修复解耦，人类决定修什么、不修什么
+
+**当前问题：**
+review-agent 和 convention-extraction 各自产出报告，但 report → fix prompt 之间缺少人工判断环节。所有 finding 被无差别地转为 fix prompt，实际上部分应 defer 或 wontfix。
+
+**目标流程：**
+```
+review-report.md ─┐
+                  ├→ 人工 triage (fix / defer / wontfix) → fix prompt (仅 fix 项)
+extraction.md ────┘                                      → open-issues.md (defer 项)
+```
+
+**待设计项：**
+
+| # | 项 | 说明 |
+|---|-----|------|
+| 1 | Triage 标记格式 | 在 report 中如何标记 fix/defer/wontfix（inline annotation? 独立 triage 文件?） |
+| 2 | open-issues.md 结构 | defer 项如何组织（按模块? 按严重度? 按类型?），如何跟踪生命周期 |
+| 3 | 多报告汇聚规则 | 多份报告中重复/冲突的 finding 如何合并为一个 fix prompt |
+| 4 | 未来报告类型扩展点 | 除 review 和 extraction 外，未来可能有 security-scan、performance-audit 等报告源 |
+
+---
+
 ## v2 — 内嵌 AI Chat（BO 管理界面增强）
 
 > 核心目标：执行异常时，人类不需要自己翻 context，AI chat 自动提供诊断
@@ -94,6 +119,9 @@ agent.py CLI        内嵌 Claude chat       自动分解 + 自动执行 + 人�
 | 2025-02-01 | agent.py 使用 `--dangerously-skip-permissions` | 自动化执行需要，prompt 本身已经过人类审核 |
 | 2025-02-01 | stream-json 输出而非纯文本 | 需要结构化解析工具调用和统计信息 |
 | 2025-02-03 | 10 个 prompt 分 3 批执行而非一次性 | 当前缺少"假成功"检测，分批+人工验收是临时方案 |
+| 2025-02-05 | BO v2 选择"AI chat + 上下文"而非纯规则自动化 | s-2-1 实证：DependencyResolutionGate 拦不住"我以为存在但其实不存在"的认知盲区（如 admin 凭据问题）。规则处理已知模式，chat 兜底未知盲区。这验证了 v2 的 chat 环节设计方向 |
+| 2025-02-05 | Review-agent ROI 首个定量数据点 | s-2-1 后跑 review-agent，~$1-2 成本发现 6 个修复点（含 role type 不匹配、过期枚举）。如留到后续模块，修复成本估计翻 3-5x |
+| 2025-02-05 | 报告与修复必须解耦，需引入人工 triage 环节 | s-2-1 实践暴露：review report → 直接生成 fix prompt 跳过了人工判断。部分 finding 应 defer 或 wontfix，不应全部修复 |
 
 ---
 
@@ -102,3 +130,4 @@ agent.py CLI        内嵌 Claude chat       自动分解 + 自动执行 + 人�
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | v0.1 | 2025-02-03 | 初始版本，整合已知需求和 s-1-2 执行中发现的痛点 |
+| v0.2 | 2025-02-05 | 新增 v1.2 Triage 流程章节；决策记录追加 s-2-1 验证数据（chat 价值验证、review-agent ROI、报告解耦） |
