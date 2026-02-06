@@ -1,8 +1,8 @@
 # MIMIR Build Orchestrator — Roadmap
 
 > **版本**: v0.3  
-> **创建日期**: 2025-02-03  
-> **最后更新**: 2025-02-05  
+> **创建日期**: 2026-02-03  
+> **最后更新**: 2026-02-05  
 > **当前版本**: BO v1（agent.py v0.6 + localStorage 管理界面）
 
 ---
@@ -176,15 +176,15 @@ decompose 阶段发现跨模块依赖时，必须走以下流程：
 
 | 日期 | 决策 | 原因 |
 |------|------|------|
-| 2025-02-01 | agent.py 使用 `--dangerously-skip-permissions` | 自动化执行需要，prompt 本身已经过人类审核 |
-| 2025-02-01 | stream-json 输出而非纯文本 | 需要结构化解析工具调用和统计信息 |
-| 2025-02-03 | 10 个 prompt 分 3 批执行而非一次性 | 当前缺少"假成功"检测，分批+人工验收是临时方案 |
-| 2025-02-05 | BO v2 选择"AI chat + 上下文"而非纯规则自动化 | s-2-1 实证：DependencyResolutionGate 拦不住"我以为存在但其实不存在"的认知盲区（如 admin 凭据问题）。规则处理已知模式，chat 兜底未知盲区。这验证了 v2 的 chat 环节设计方向 |
-| 2025-02-05 | Review-agent ROI 首个定量数据点 | s-2-1 后跑 review-agent，~$1-2 成本发现 6 个修复点（含 role type 不匹配、过期枚举）。如留到后续模块，修复成本估计翻 3-5x |
-| 2025-02-05 | 报告与修复必须解耦，需引入人工 triage 环节 | s-2-1 实践暴露：review report → 直接生成 fix prompt 跳过了人工判断。部分 finding 应 defer 或 wontfix，不应全部修复 |
-| 2025-02-05 | Decompose 跨模块依赖必须显式决策 | s-2-2 decompose 静默吞并 s-2-3 导致：plan 与执行脱节 + 半吞并（吞了但没做完）。无论"声明依赖"还是"合并模块"，都必须反馈用户确认并更新 plan |
-| 2025-02-05 | fix-p2-2 验证了 review→triage→fix prompt 模式 | 6 个 finding（F5-F11）按严重度标签 + 搜索关键词 + 修改前后代码 + 验证清单的结构可以工作。这是 v1.2 Triage 流程的首个实证样例 |
-| 2025-02-05 | fix prompt 必须 grep/find 先定位文件 | s-2-2 fix prompt 假设文件名 `PermissionManagement.vue`，实际是 `PermissionAssignment.vue`。agent 不会质疑 prompt 给的文件名，直接创建新文件或报错。fix-s-2-2-permission-integration.md 已实践"先 grep 确认再写代码"模式 |
+| 2026-02-01 | agent.py 使用 `--dangerously-skip-permissions` | 自动化执行需要，prompt 本身已经过人类审核 |
+| 2026-02-01 | stream-json 输出而非纯文本 | 需要结构化解析工具调用和统计信息 |
+| 2026-02-03 | 10 个 prompt 分 3 批执行而非一次性 | 当前缺少"假成功"检测，分批+人工验收是临时方案 |
+| 2026-02-05 | BO v2 选择"AI chat + 上下文"而非纯规则自动化 | s-2-1 实证：DependencyResolutionGate 拦不住"我以为存在但其实不存在"的认知盲区（如 admin 凭据问题）。规则处理已知模式，chat 兜底未知盲区。这验证了 v2 的 chat 环节设计方向 |
+| 2026-02-05 | Review-agent ROI 首个定量数据点 | s-2-1 后跑 review-agent，~$1-2 成本发现 6 个修复点（含 role type 不匹配、过期枚举）。如留到后续模块，修复成本估计翻 3-5x |
+| 2026-02-05 | 报告与修复必须解耦，需引入人工 triage 环节 | s-2-1 实践暴露：review report → 直接生成 fix prompt 跳过了人工判断。部分 finding 应 defer 或 wontfix，不应全部修复 |
+| 2026-02-05 | Decompose 跨模块依赖必须显式决策 | s-2-2 decompose 静默吞并 s-2-3 导致：plan 与执行脱节 + 半吞并（吞了但没做完）。无论"声明依赖"还是"合并模块"，都必须反馈用户确认并更新 plan |
+| 2026-02-05 | fix-p2-2 验证了 review→triage→fix prompt 模式 | 6 个 finding（F5-F11）按严重度标签 + 搜索关键词 + 修改前后代码 + 验证清单的结构可以工作。这是 v1.2 Triage 流程的首个实证样例 |
+| 2026-02-05 | fix prompt 必须 grep/find 先定位文件 | s-2-2 fix prompt 假设文件名 `PermissionManagement.vue`，实际是 `PermissionAssignment.vue`。agent 不会质疑 prompt 给的文件名，直接创建新文件或报错。fix-s-2-2-permission-integration.md 已实践"先 grep 确认再写代码"模式 |
 
 ---
 
@@ -192,6 +192,6 @@ decompose 阶段发现跨模块依赖时，必须走以下流程：
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| v0.1 | 2025-02-03 | 初始版本，整合已知需求和 s-1-2 执行中发现的痛点 |
-| v0.2 | 2025-02-05 | 新增 v1.2 Triage 流程章节；决策记录追加 s-2-1 验证数据（chat 价值验证、review-agent ROI、报告解耦） |
-| v0.3 | 2025-02-05 | s-2-2/s-2-3 经验更新：v1.2 Triage 充实实例数据（fix-p2-2）；新增 v1.3 Decompose 跨模块依赖控制；v1.1 新增 fix prompt 文件定位规范；决策记录 +3 条 |
+| v0.1 | 2026-02-03 | 初始版本，整合已知需求和 s-1-2 执行中发现的痛点 |
+| v0.2 | 2026-02-05 | 新增 v1.2 Triage 流程章节；决策记录追加 s-2-1 验证数据（chat 价值验证、review-agent ROI、报告解耦） |
+| v0.3 | 2026-02-05 | s-2-2/s-2-3 经验更新：v1.2 Triage 充实实例数据（fix-p2-2）；新增 v1.3 Decompose 跨模块依赖控制；v1.1 新增 fix prompt 文件定位规范；决策记录 +3 条 |
