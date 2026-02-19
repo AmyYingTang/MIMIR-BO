@@ -1,0 +1,89 @@
+# Admin Guide 骨架模板
+# 面向平台管理员，聚焦用户管理、审计、系统配置
+
+doc_type: admin-guide
+description: 面向平台管理员的管理操作指南
+
+pages:
+  # --- 第1批：数据提取页 ---
+  - path: reference/role-matrix.md
+    sources: [security_arch, api_design]
+    role: 完整角色权限矩阵
+    batch: 1
+    extract_strategy: |
+      从 security_arch 提取所有角色定义（比 user-guide 更详细）
+      从 api_design 提取每个管理端点的权限要求
+      包含管理员特有操作：用户管理、审计查看、系统配置
+      转化为完整的权限矩阵表格
+
+  - path: reference/api-reference.md
+    sources: [api_design]
+    role: 管理相关 API 参考
+    batch: 1
+    extract_strategy: |
+      从 api_design 提取管理员专用端点
+      允许展示端点路径和参数（audience=admin 允许技术概念）
+      但禁止暴露实现细节（ORM、中间件、JWT 结构）
+
+  # --- 第2批：操作指南页 ---
+  - path: guides/user-management.md
+    sources: [api_design, security_arch, business_rules]
+    role: 用户账户管理
+    batch: 2
+    extract_strategy: |
+      从 api_design 提取用户管理端点（创建/禁用/角色分配）
+      从 security_arch 提取角色分配规则和约束
+      从 business_rules 提取用户相关的业务规则
+
+  - path: guides/audit-logs.md
+    sources: [api_design, database_design]
+    role: 审计日志查看与分析
+    batch: 2
+    extract_strategy: |
+      从 api_design 提取审计日志查询端点和筛选参数
+      从 database_design 提取审计日志表结构（转化为日志字段含义）
+      说明日志保留策略、导出方式
+
+  - path: guides/system-config.md
+    sources: [business_rules, api_design]
+    role: 系统配置与参数管理
+    batch: 2
+    extract_strategy: |
+      从 business_rules 提取可配置的系统参数
+      从 api_design 提取配置管理端点
+      说明每个参数的含义、默认值、修改影响
+
+  - path: guides/monitoring.md
+    sources: [api_design]
+    role: 系统监控与告警
+    batch: 2
+    extract_strategy: |
+      从 api_design 提取健康检查、统计端点
+      说明关键指标含义和告警阈值建议
+      如果源文档缺少监控内容，大部分标记为 [待确认]
+
+  # --- 第3批：综合页 ---
+  - path: quickstart.md
+    sources: [synthesized]
+    role: 管理员快速上手
+    batch: 3
+    extract_strategy: |
+      从已填充的管理操作页面提炼
+      聚焦管理员首次登录后最常执行的 3-5 个操作
+      与 user-guide 的 quickstart 风格一致但内容完全不同
+
+  - path: faq.md
+    sources: [synthesized]
+    role: 管理员常见问题
+    batch: 3
+    extract_strategy: |
+      聚焦管理场景：权限问题、审计查询、用户投诉处理
+      从各指南页面的限制和边界条件反向生成
+
+  - path: index.md
+    sources: [synthesized]
+    role: 管理员首页概览
+    batch: 3
+    extract_strategy: |
+      管理职责概览，而非功能概览
+      强调管理员的日常工作流：用户管理→监控→审计→配置
