@@ -72,6 +72,80 @@ UNKNOWN_MARKER=$(grep -A10 "^writing_rules:" "$CONFIG" | grep "unknown_value_mar
 OUTPUT_PATH="${PROJECT_DIR}/${OUTPUT_DIR}"
 mkdir -p "${OUTPUT_PATH}/docs" "${OUTPUT_PATH}/prompts"
 
+# ─── 模糊文件匹配 ───
+# 如果精确路径不存在，尝试模糊匹配（如 prd 匹配 prd-v1.2.md）
+resolve_source_path() {
+    local configured_path="$1"
+    local full_path="${PROJECT_DIR}/${configured_path}"
+
+    # 精确匹配
+    if [ -f "$full_path" ]; then
+        echo "$full_path"
+        return 0
+    fi
+
+    # 模糊匹配：在同目录下找文件名中包含关键词的文件
+    local dir=$(dirname "$full_path")
+    local base=$(basename "$configured_path" .md)
+    if [ -d "$dir" ]; then
+        local match=$(find "$dir" -maxdepth 1 -name "*${base}*" -type f 2>/dev/null | head -1)
+        if [ -n "$match" ]; then
+            echo "$match"
+            return 0
+        fi
+    fi
+
+    # 未找到
+    echo ""
+    return 1
+}
+
+# ─── 构建源文档清单（带模糊匹配）───
+build_source_list() {
+    local found=0
+    local missing=0
+    while IFS='=' read -r key val; do
+        [ -z "$key" ] && continue
+        local resolved=$(resolve_source_path "$val")
+        if [ -n "$resolved" ]; then
+            local configured="${PROJECT_DIR}/${val}"
+            if [ "$resolved" = "$configured" ]; then
+                echo "  ✅ ${key}: ${resolved}"
+            else
+                echo "  ✅ ${key}: ${resolved} (模糊匹配)"
+            fi
+            found=$((found + 1))
+        else
+            echo "  ⚠️  ${key}: ${PROJECT_DIR}/${val} (未找到，将跳过)"
+            missing=$((missing + 1))
+        fi
+    done <<< "$SOURCE_DOCS"
+    echo ""
+    echo "  找到 ${found} 个源文档，${missing} 个未找到"
+    if [ $missing -gt 0 ]; then
+        echo "  💡 缺失的源文档不会阻断执行，相关内容将标记为 ${UNKNOWN_MARKER}"
+    fi
+}
+
+# ─── 构建源文档路径引用（供 prompt 使用）───
+build_source_refs() {
+    local refs=""
+    while IFS='=' read -r key val; do
+        [ -z "$key" ] && continue
+        local resolved=$(resolve_source_path "$val")
+        if [ -n "$resolved" ]; then
+            refs="${refs}
+- ${key}: ${resolved}"
+        else
+            refs="${refs}
+- ${key}: (未提供，相关内容标记为 ${UNKNOWN_MARKER})"
+        fi
+    done <<< "$SOURCE_DOCS"
+    echo "$refs"
+}
+
+SOURCE_REFS=$(build_source_refs)
+
 # ─── 打印信息 ───
 echo "╔══════════════════════════════════════════╗"
 echo "║     📄 MIMIR-BO Doc-Gen Agent            ║"
@@ -86,51 +160,69 @@ echo "  输出目录 : $OUTPUT_PATH"
 echo "  项目目录 : $PROJECT_DIR"
 echo "  执行步骤 : $STEP"
 echo ""
-
-# ─── 构建源文档清单 ───
-build_source_list() {
-    local list=""
-    while IFS='=' read -r key val; do
-        [ -z "$key" ] && continue
-        local full_path="${PROJECT_DIR}/${val}"
-        if [ -f "$full_path" ]; then
-            list="${list}  ✅ ${key}: ${full_path}\n"
-        else
-            list="${list}  ❌ ${key}: ${full_path} (文件不存在)\n"
-        fi
-    done <<< "$SOURCE_DOCS"
-    echo -e "$list"
-}
-
 echo "源文档:"
 build_source_list
 echo ""
 
-# ─── 构建源文档内容块（供 prompt 引用）───
-build_source_content_refs() {
-    local refs=""
-    while IFS='=' read -r key val; do
-        [ -z "$key" ] && continue
-        local full_path="${PROJECT_DIR}/${val}"
-        if [ -f "$full_path" ]; then
-            refs="${refs}\n源文档 ${key} 的路径: ${full_path}\n"
-        fi
-    done <<< "$SOURCE_DOCS"
-    echo -e "$refs"
-}
+# ─── Claude 调用封装 ───
+# 对齐 review.sh / extract.sh 的调用方式：直接传 prompt 参数
+run_claude() {
+    local prompt="$1"
+    local label="$2"
 
-SOURCE_REFS=$(build_source_content_refs)
+    claude -p "$prompt" \
+        --verbose \
+        --output-format stream-json \
+        --dangerously-skip-permissions \
+        2>&1 | while IFS= read -r line; do
+
+        # 尝试解析 JSON
+        if echo "$line" | python3 -c "
+import sys, json
+try:
+    e = json.load(sys.stdin)
+    t = e.get('type','')
+    if t == 'assistant' and 'content' in e:
+        for block in e['content']:
+            if block.get('type') == 'text':
+                text = block['text'][:300]
+                print(f'  💬 {text}')
+            elif block.get('type') == 'tool_use':
+                name = block.get('name','')
+                inp = str(block.get('input',{}))[:150]
+                print(f'  🔧 {name}: {inp}')
+    elif t == 'result':
+        cost = e.get('cost_usd', '?')
+        duration = e.get('duration_ms', 0)
+        print(f'  📊 {label} 完成. 💰 \${cost} | ⏱ {duration/1000:.1f}s')
+except:
+    pass
+" 2>/dev/null; then
+            :
+        else
+            [ -n "$line" ] && echo "  $line"
+        fi
+    done
+}
 
 # ─── Step 1: 分析源文档 ───
 run_analyze() {
     echo "🔍 Step 1: 分析源文档..."
     echo ""
 
-    local prompt="$(cat <<PROMPT
+    local system_prompt_ref=""
+    if [ -f "${SCRIPT_DIR}/system-prompt.md" ]; then
+        system_prompt_ref="请先读取 ${SCRIPT_DIR}/system-prompt.md 作为你的行为准则。"
+    fi
+
+    local prompt="${system_prompt_ref}
+
 你是 MIMIR-BO doc-gen-agent，正在执行 Step 1：源文档分析。
 
 ## 任务
 扫描以下源文档，生成覆盖分析报告。
+
+源文档清单：
 ${SOURCE_REFS}
 
 ## 配置
@@ -138,37 +230,22 @@ ${SOURCE_REFS}
 - 目标读者: ${AUDIENCE}
 
 ## 要求
-1. 读取每个源文档，生成摘要：文件名 | 主要覆盖内容 | 可提取的用户文档条目
+1. 读取每个存在的源文档，生成摘要：文件名 | 主要覆盖内容 | 可提取的用户文档条目
 2. 标记 ${DOC_TYPE} 所需但源文档未覆盖的领域为 ⚠️ 缺失
-3. 将报告输出到 ${OUTPUT_PATH}/analysis-report.md
+3. 缺失的源文档也列出，标注为未提供
+4. 将报告输出到 ${OUTPUT_PATH}/analysis-report.md
 
 ## 输出格式
-Markdown 表格 + 缺失领域列表
-PROMPT
-    )"
+Markdown 表格 + 缺失领域列表"
 
-    echo "$prompt" | claude -p --allowedTools "Read,Write" --output-format stream-json \
-        2>/dev/null | python3 -c "
-import sys, json
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    try:
-        obj = json.loads(line)
-        if obj.get('type') == 'assistant' and 'content' in obj:
-            for block in obj['content']:
-                if block.get('type') == 'text':
-                    print(block['text'], end='', flush=True)
-        elif obj.get('type') == 'result':
-            cost = obj.get('cost_usd', 0)
-            duration = obj.get('duration_ms', 0)
-            print(f'\n\n  💰 Cost: \${cost:.2f} | ⏱ Duration: {duration/1000:.1f}s')
-    except json.JSONDecodeError:
-        pass
-" 2>/dev/null || echo "  ⚠️ 输出解析失败，请检查 ${OUTPUT_PATH}/analysis-report.md"
+    run_claude "$prompt" "分析"
 
     echo ""
-    echo "  ✅ 分析报告: ${OUTPUT_PATH}/analysis-report.md"
+    if [ -f "${OUTPUT_PATH}/analysis-report.md" ]; then
+        echo "  ✅ 分析报告: ${OUTPUT_PATH}/analysis-report.md"
+    else
+        echo "  ⚠️  分析报告未生成，请检查上方输出"
+    fi
     echo ""
 }
 
@@ -177,33 +254,29 @@ run_skeleton() {
     echo "🦴 Step 2: 生成骨架 + 提取 prompt..."
     echo ""
 
-    # 读取骨架模板（如果存在）
     local template_file="${SCRIPT_DIR}/templates/${DOC_TYPE}.yml"
     local template_ref=""
     if [ -f "$template_file" ]; then
-        template_ref="骨架模板文件: ${template_file}（请读取并遵循其结构定义）"
+        template_ref="请先读取骨架模板文件 ${template_file}，按其中定义的页面结构、源文档映射和提取策略来生成。"
     else
-        template_ref="无预定义模板，请根据 doc_type=${DOC_TYPE} 和 audience=${AUDIENCE} 自行推导合理的文档结构"
+        template_ref="无预定义模板，请根据 doc_type=${DOC_TYPE} 和 audience=${AUDIENCE} 自行推导合理的文档结构。"
     fi
 
-    # 读取系统 prompt
-    local system_prompt_file="${SCRIPT_DIR}/system-prompt.md"
     local system_prompt_ref=""
-    if [ -f "$system_prompt_file" ]; then
-        system_prompt_ref="系统角色定义: ${system_prompt_file}（请先读取作为你的行为准则）"
+    if [ -f "${SCRIPT_DIR}/system-prompt.md" ]; then
+        system_prompt_ref="请先读取 ${SCRIPT_DIR}/system-prompt.md 作为你的行为准则。"
     fi
 
-    local prompt="$(cat <<PROMPT
+    local prompt="${system_prompt_ref}
+
 你是 MIMIR-BO doc-gen-agent，正在执行 Step 2：生成骨架和提取 prompt。
 
-${system_prompt_ref}
-
-## 任务
-根据分析报告和配置，生成文档骨架和填充用的提取 prompt。
+${template_ref}
 
 ## 输入
 - 分析报告: ${OUTPUT_PATH}/analysis-report.md（请先读取）
-- ${template_ref}
+
+源文档清单：
 ${SOURCE_REFS}
 
 ## 配置
@@ -232,41 +305,20 @@ ${SOURCE_REFS}
 
 ### 4. 提取 Prompt
 在 ${OUTPUT_PATH}/prompts/ 下为每个页面生成独立的提取 prompt：
-- 00-common-rules.md: 通用写作指令（读者意识、术语禁止、格式要求）
+- 00-common-rules.md: 通用写作指令
 - 01-xxx.md ~ NN-xxx.md: 每页的具体提取任务
 
 每个提取 prompt 必须包含：
 - 需要读取的源文档路径（使用绝对路径）
-- 目标骨架文件路径
-- 转化规则（技术术语→用户语言的映射）
-- 该页面特有的约束
-PROMPT
-    )"
+- 目标骨架文件路径（使用绝对路径）
+- 转化规则和该页面特有的约束"
 
-    echo "$prompt" | claude -p --allowedTools "Read,Write" --output-format stream-json \
-        2>/dev/null | python3 -c "
-import sys, json
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    try:
-        obj = json.loads(line)
-        if obj.get('type') == 'assistant' and 'content' in obj:
-            for block in obj['content']:
-                if block.get('type') == 'text':
-                    print(block['text'], end='', flush=True)
-        elif obj.get('type') == 'result':
-            cost = obj.get('cost_usd', 0)
-            duration = obj.get('duration_ms', 0)
-            print(f'\n\n  💰 Cost: \${cost:.2f} | ⏱ Duration: {duration/1000:.1f}s')
-    except json.JSONDecodeError:
-        pass
-" 2>/dev/null || echo "  ⚠️ 输出解析失败"
+    run_claude "$prompt" "骨架生成"
 
     echo ""
-    echo "  ✅ 骨架文件: ${OUTPUT_PATH}/docs/"
-    echo "  ✅ 提取 prompt: ${OUTPUT_PATH}/prompts/"
-    echo "  ✅ 填充顺序: ${OUTPUT_PATH}/fill-order.md"
+    [ -d "${OUTPUT_PATH}/docs" ] && echo "  ✅ 骨架文件: ${OUTPUT_PATH}/docs/"
+    [ -d "${OUTPUT_PATH}/prompts" ] && echo "  ✅ 提取 prompt: ${OUTPUT_PATH}/prompts/"
+    [ -f "${OUTPUT_PATH}/fill-order.md" ] && echo "  ✅ 填充顺序: ${OUTPUT_PATH}/fill-order.md"
     echo ""
 }
 
@@ -282,18 +334,20 @@ run_fill() {
         exit 1
     fi
 
-    # 按文件名排序逐个执行
-    local count=0
     local total=$(ls "${OUTPUT_PATH}"/prompts/[0-9]*.md 2>/dev/null | grep -v "00-common-rules.md" | wc -l | tr -d ' ')
+    if [ "$total" = "0" ]; then
+        echo "  ❌ 未找到提取 prompt 文件"
+        exit 1
+    fi
 
+    local count=0
     for prompt_file in "${OUTPUT_PATH}"/prompts/[0-9]*.md; do
         [ "$prompt_file" = "$common_rules" ] && continue
         count=$((count + 1))
         local page_name=$(basename "$prompt_file" .md | sed 's/^[0-9]*-//')
         echo "  [$count/$total] 📄 填充: $page_name"
 
-        local prompt="$(cat <<PROMPT
-你是 MIMIR-BO doc-gen-agent，正在执行 Step 3：内容填充。
+        local prompt="你是 MIMIR-BO doc-gen-agent，正在执行 Step 3：内容填充。
 
 ## 任务
 按照提取 prompt 的要求，用源文档中的真实信息填充骨架页面。
@@ -307,25 +361,9 @@ run_fill() {
 - 找不到的数值标记为 ${UNKNOWN_MARKER}
 - 保留 Markdown 原有结构
 - 保留截图占位标记
-- 填充完成后覆盖写回目标文件
-PROMPT
-        )"
+- 填充完成后覆盖写回目标文件"
 
-        echo "$prompt" | claude -p --allowedTools "Read,Write" --output-format stream-json \
-            2>/dev/null | python3 -c "
-import sys, json
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    try:
-        obj = json.loads(line)
-        if obj.get('type') == 'result':
-            cost = obj.get('cost_usd', 0)
-            duration = obj.get('duration_ms', 0)
-            print(f'         💰 \${cost:.2f} | ⏱ {duration/1000:.1f}s')
-    except json.JSONDecodeError:
-        pass
-" 2>/dev/null || echo "         ⚠️ 填充可能未完成"
+        run_claude "$prompt" "$page_name"
 
     done
 
@@ -339,8 +377,7 @@ run_qa() {
     echo "🔍 Step 4: 自检..."
     echo ""
 
-    local prompt="$(cat <<PROMPT
-你是 MIMIR-BO doc-gen-agent，正在执行 Step 4：质量自检。
+    local prompt="你是 MIMIR-BO doc-gen-agent，正在执行 Step 4：质量自检。
 
 ## 任务
 扫描 ${OUTPUT_PATH}/docs/ 下所有 .md 文件，执行以下检查：
@@ -353,44 +390,29 @@ run_qa() {
 
 ## 输出
 将自检报告输出到 ${OUTPUT_PATH}/qa-report.md，包含：
-- 📊 总览表（页面数、填充完成数、待确认数、断链数、截图占位数）
+- 📊 总览表
 - 各检查项的详细结果
-- 每项用 ✅ 通过 或 ⚠️ 有问题 标记
-PROMPT
-    )"
+- 每项用 ✅ 通过 或 ⚠️ 有问题 标记"
 
-    echo "$prompt" | claude -p --allowedTools "Read,Write" --output-format stream-json \
-        2>/dev/null | python3 -c "
-import sys, json
-for line in sys.stdin:
-    line = line.strip()
-    if not line: continue
-    try:
-        obj = json.loads(line)
-        if obj.get('type') == 'assistant' and 'content' in obj:
-            for block in obj['content']:
-                if block.get('type') == 'text':
-                    print(block['text'], end='', flush=True)
-        elif obj.get('type') == 'result':
-            cost = obj.get('cost_usd', 0)
-            duration = obj.get('duration_ms', 0)
-            print(f'\n\n  💰 Cost: \${cost:.2f} | ⏱ Duration: {duration/1000:.1f}s')
-    except json.JSONDecodeError:
-        pass
-" 2>/dev/null || echo "  ⚠️ 自检可能未完成"
+    run_claude "$prompt" "自检"
 
     echo ""
-    echo "  ✅ 自检报告: ${OUTPUT_PATH}/qa-report.md"
+    if [ -f "${OUTPUT_PATH}/qa-report.md" ]; then
+        echo "  ✅ 自检报告: ${OUTPUT_PATH}/qa-report.md"
+    else
+        echo "  ⚠️  自检报告未生成"
+    fi
 
     # 构建（如果是 mkdocs 格式）
     if [ "$OUTPUT_FORMAT" = "mkdocs" ]; then
         echo ""
         echo "🔨 构建 MkDocs 站点..."
         if command -v mkdocs >/dev/null 2>&1; then
-            cd "$OUTPUT_PATH" && mkdocs build 2>&1 | tail -5
+            (cd "$OUTPUT_PATH" && mkdocs build 2>&1 | tail -5)
             echo "  ✅ 站点输出: ${OUTPUT_PATH}/site/"
         else
-            echo "  ⚠️ mkdocs 未安装，跳过构建。请运行: pipx install mkdocs && pipx inject mkdocs mkdocs-material"
+            echo "  ⚠️  mkdocs 未安装，跳过构建"
+            echo "  安装: pipx install mkdocs==1.6.1 && pipx inject mkdocs mkdocs-material"
         fi
     fi
 

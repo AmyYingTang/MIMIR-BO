@@ -1,0 +1,127 @@
+# Ops Manual 骨架模板
+# 面向运维/DevOps 人员，允许完整技术细节（命令、配置、脚本）
+
+doc_type: ops-manual
+description: 面向运维人员的部署与运维手册
+
+pages:
+  # --- 第1批：参考数据页 ---
+  - path: reference/ports-and-services.md
+    sources: [deployment_guide, api_design]
+    role: 端口与服务清单
+    batch: 1
+    extract_strategy: |
+      从 deployment_guide 提取端口使用表和服务架构
+      从 api_design 提取健康检查端点
+      包含生产环境暴露策略（哪些端口仅容器内部通信）
+
+  - path: reference/env-variables.md
+    sources: [deployment_guide]
+    role: 环境变量完整参考
+    batch: 1
+    extract_strategy: |
+      从 deployment_guide 提取完整的 .env 配置项
+      按分类整理：数据库、Redis、JWT、AES、SMTP、应用、文件存储
+      标注 [必改] 项和默认值
+      包含密钥生成命令
+
+  - path: reference/directory-structure.md
+    sources: [deployment_guide]
+    role: 目录结构与文件说明
+    batch: 1
+    extract_strategy: |
+      从 deployment_guide 提取部署目录结构
+      补充各目录的用途、权限要求、磁盘增长预期
+
+  - path: reference/security-checklist.md
+    sources: [deployment_guide, security_arch]
+    role: 安全加固检查清单
+    batch: 1
+    extract_strategy: |
+      从 deployment_guide 提取安全检查清单和防火墙配置
+      从 security_arch 补充应用层安全策略（如有）
+      转化为可勾选的 checklist 格式
+
+  # --- 第2批：操作指南页 ---
+  - path: guides/fresh-install.md
+    sources: [deployment_guide]
+    role: 全新部署步骤
+    batch: 2
+    extract_strategy: |
+      从 deployment_guide 提取完整部署流程（§2-§4）
+      包含：系统要求、Docker 安装、代码拉取、数据目录、环境变量、compose 启动
+      保留所有命令和代码块
+      按执行顺序组织，每步标注预期结果
+
+  - path: guides/ssl-setup.md
+    sources: [deployment_guide]
+    role: SSL/HTTPS 配置
+    batch: 2
+    extract_strategy: |
+      从 deployment_guide 提取 SSL 三种方案（Let's Encrypt、企业CA、自签名）
+      包含 Nginx 配置、证书续签 crontab、验证命令
+      标注生产环境推荐方案
+
+  - path: guides/gpu-setup.md
+    sources: [deployment_guide]
+    role: GPU 训练环境配置
+    batch: 2
+    extract_strategy: |
+      从 deployment_guide 提取方案A（同服务器GPU）和方案B（远程GPU）
+      包含 nvidia-container-toolkit 安装、docker-compose GPU 配置
+      标注两种方案的适用场景和硬件要求差异
+
+  - path: guides/backup-restore.md
+    sources: [deployment_guide]
+    role: 备份与恢复
+    batch: 2
+    extract_strategy: |
+      从 deployment_guide 提取数据库备份/恢复命令
+      包含 crontab 定时备份配置、保留策略
+      补充模型文件备份建议（data/models 目录）
+
+  - path: guides/update-rollback.md
+    sources: [deployment_guide]
+    role: 应用更新与回滚
+    batch: 2
+    extract_strategy: |
+      从 deployment_guide 提取更新流程和回滚流程
+      包含数据库迁移（alembic）命令
+      强调滚动重启顺序和验证步骤
+
+  - path: guides/monitoring-ops.md
+    sources: [deployment_guide, api_design]
+    role: 监控、日志与告警
+    batch: 2
+    extract_strategy: |
+      从 deployment_guide 提取日志收集、磁盘监控、健康检查脚本
+      从 api_design 提取健康检查端点的返回值含义
+      包含 crontab 配置和日志导出命令
+
+  # --- 第3批：综合页 ---
+  - path: troubleshooting.md
+    sources: [deployment_guide]
+    role: 故障排查手册
+    batch: 3
+    extract_strategy: |
+      从 deployment_guide 提取常见问题表和日志位置速查
+      从已填充的各指南页面补充更多排查场景
+      按症状组织（启动失败、连接失败、性能问题）
+
+  - path: quickstart.md
+    sources: [synthesized]
+    role: 运维快速上手
+    batch: 3
+    extract_strategy: |
+      从已填充的 fresh-install 和 monitoring-ops 提炼
+      最小化部署步骤（假设环境已就绪）
+      聚焦：拉代码→配置.env→docker compose up→验证
+
+  - path: index.md
+    sources: [synthesized]
+    role: 运维手册首页
+    batch: 3
+    extract_strategy: |
+      系统架构概述（服务组成、容器关系）
+      硬件配置推荐（最低/推荐，含GPU方案选择指引）
+      从已填充页面提炼各章节导航
