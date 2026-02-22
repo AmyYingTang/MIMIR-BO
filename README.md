@@ -21,14 +21,14 @@ MIMIR 定义了人类与 AI 协作的方法论（菜谱），BO 是让这套方�
 
 ### RunPrompt Agent — 自动化 Prompt 执行器
 
-`runprompt-agent/agent.py` — 调用 Claude Code CLI 顺序执行 Prompt 文件。
+`agents/runprompt-agent/agent.py` — 调用 Claude Code CLI 顺序执行 Prompt 文件。
 
 ```bash
 # 单个文件
-python runprompt-agent/agent.py run ./01-init.md --project ~/my-project
+python agents/runprompt-agent/agent.py run ./01-init.md --project ~/my-project
 
 # 多个文件（按文件名排序执行）
-python runprompt-agent/agent.py run ./prompts/*.md --project ~/my-project
+python agents/runprompt-agent/agent.py run ./prompts/*.md --project ~/my-project
 ```
 
 核心特性：
@@ -40,11 +40,11 @@ python runprompt-agent/agent.py run ./prompts/*.md --project ~/my-project
 
 ### Review Agent — 独立代码审查 🆕
 
-`review-agent/review.sh` — 模块开发完成后，独立对照设计文档检查代码一致性。
+`agents/review-agent/review.sh` — 模块开发完成后，独立对照设计文档检查代码一致性。
 
 ```bash
 # 在项目根目录执行
-~/mimir-bo/review-agent/review.sh auth ~/my-project
+~/mimir-bo/agents/review-agent/review.sh auth ~/my-project
 ```
 
 核心特性：
@@ -54,14 +54,14 @@ python runprompt-agent/agent.py run ./prompts/*.md --project ~/my-project
 
 ### Convention Extraction — 跨模块约定提取 🆕
 
-`convention-extraction/extract.sh` — 模块验收后，从代码中提取隐式约定，生成快照供下一模块 prompt 使用。
+`agents/convention-extraction/extract.sh` — 模块验收后，从代码中提取隐式约定，生成快照供下一模块 prompt 使用。
 
 ```bash
 # 模块1完成后提取初始快照
-~/mimir-bo/convention-extraction/extract.sh auth ~/my-project
+~/mimir-bo/agents/convention-extraction/extract.sh auth ~/my-project
 
 # 模块2完成后更新快照（自动递增版本）
-~/mimir-bo/convention-extraction/extract.sh training ~/my-project
+~/mimir-bo/agents/convention-extraction/extract.sh training ~/my-project
 ```
 
 核心特性：
@@ -88,17 +88,23 @@ python runprompt-agent/agent.py run ./prompts/*.md --project ~/my-project
 mimir-bo/
 ├── README.md                 # 本文件
 ├── ROADMAP.md                # 演进路线图
-├── runprompt-agent/
-│   ├── agent.py              # Prompt 执行器 (v0.6)
-│   └── README.md             # 使用说明
-├── review-agent/
-│   ├── review.sh             # Runner 脚本
-│   ├── review-prompt.md      # Review prompt 模板
-│   └── README.md             # 使用说明
-├── convention-extraction/
-│   ├── extract.sh            # Runner 脚本
-│   ├── extraction-prompt.md  # Extraction prompt 模板
-│   └── README.md             # 使用说明
+├── agents/
+│   ├── runprompt-agent/
+│   │   ├── agent.py          # Prompt 执行器 (v0.6)
+│   │   └── README.md         # 使用说明
+│   ├── review-agent/
+│   │   ├── review.sh         # Runner 脚本
+│   │   ├── review-prompt.md  # Review prompt 模板
+│   │   └── README.md         # 使用说明
+│   ├── convention-extraction/
+│   │   ├── extract.sh        # Runner 脚本
+│   │   ├── extraction-prompt.md  # Extraction prompt 模板
+│   │   └── README.md         # 使用说明
+│   └── doc-gen-agent/        # 文档生成 Agent
+│       ├── doc-gen.sh        # Runner 脚本
+│       ├── system-prompt.md  # Agent 主 Prompt
+│       ├── templates/        # 配置与骨架模板
+│       └── DESIGN.md         # 设计文档
 ├── dashboard/
 │   ├── mimir-bo.html         # 管理界面（单文件）
 │   └── README.md             # Dashboard 使用说明
