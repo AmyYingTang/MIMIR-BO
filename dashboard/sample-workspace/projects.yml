@@ -1,7 +1,0 @@
-registry_path: /Users/yingtang/Documents/git/MIMIR_BO/dashboard/sample-workspace
-projects:
-  - name: voice-hub
-    workspace: /Users/yingtang/Documents/git/temp-working
-    phase: INIT
-    updated_at: '2026-02-21T13:58:14.653Z'
-    pinned: false
