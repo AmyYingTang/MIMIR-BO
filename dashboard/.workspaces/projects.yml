@@ -1,7 +1,0 @@
-registry_path: /Users/yingtang/Documents/git/MIMIR_BO/dashboard/.workspaces
-projects:
-  - name: vo
-    workspace: /Users/yingtang/Documents/git/temp-working/sample-workspace
-    phase: INIT
-    updated_at: '2026-02-21T15:21:16.323Z'
-    pinned: false
