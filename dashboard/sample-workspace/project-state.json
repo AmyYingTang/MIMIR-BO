@@ -1,0 +1,27 @@
+{
+  "project": "voice-hub",
+  "current_phase": "DESIGN",
+  "phases": {
+    "INIT": {
+      "status": "completed"
+    },
+    "DESIGN": {
+      "status": "in_progress",
+      "checklist": {}
+    },
+    "BUILD": {
+      "status": "pending",
+      "import_check": "pending",
+      "task_decompose": "pending",
+      "modules": {},
+      "checkpoint": "pending"
+    },
+    "VERIFY": {
+      "status": "pending"
+    },
+    "SHIP": {
+      "status": "pending"
+    }
+  },
+  "updated_at": "2026-02-21T13:37:23.774Z"
+}

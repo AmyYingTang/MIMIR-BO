@@ -1,0 +1,10 @@
+instance_name: voice-hub
+language: zh
+project_type: enterprise-web
+paths:
+  mimir: /Users/yingtang/Documents/git/MIMIR
+  tools: /Users/yingtang/Documents/git/MIMIR_BO
+  workspace: /Users/yingtang/Documents/git/MIMIR_BO/.workspace/voice-hub
+  project: /Users/yingtang/Documents/git/temp-working/sample-workspace
+user_content_dirs: []
+source_docs: {}

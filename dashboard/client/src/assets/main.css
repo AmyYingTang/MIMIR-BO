@@ -1,0 +1,82 @@
+:root {
+  /* Warm light theme */
+  --bg: #FAF6F1;
+  --surface: #FFFFFF;
+  --surface-alt: #F5F0EB;
+  --surface-alt2: #EDE8E2;
+  --border: #E0D8D0;
+  --border-light: #EDE7E0;
+
+  --text: #2D2A26;
+  --text-secondary: #5C574F;
+  --text-muted: #9C958C;
+  --text-dim: #C4BDB5;
+
+  --accent: #B3562A;
+  --accent-light: #D4845E;
+  --accent-bg: #FDF2EC;
+  --accent-border: #F0CDBA;
+
+  --blue: #2563eb;
+  --blue-bg: #eff6ff;
+  --blue-border: #bfdbfe;
+
+  --green: #16a34a;
+  --green-bg: #f0fdf4;
+  --green-border: #bbf7d0;
+
+  --yellow: #ca8a04;
+  --yellow-bg: #fefce8;
+  --yellow-border: #fef08a;
+
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --red-border: #fecaca;
+
+  --purple: #7c3aed;
+
+  --sidebar-width: 240px;
+  --mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
+  --serif: 'Source Serif 4', Georgia, serif;
+  --sans: 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Source+Serif+4:wght@400;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--sans);
+  color: var(--text);
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(179,86,42,0); }
+  50% { box-shadow: 0 0 10px 2px rgba(179,86,42,0.1); }
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--sans);
+}
+
+input, select, textarea {
+  font-family: var(--sans);
+}
