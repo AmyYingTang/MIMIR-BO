@@ -14,41 +14,50 @@ app.use(cors());
 app.use(express.json());
 
 // === Multi-project state ===
-let registryDir = null;   // Where projects.yml lives
-let activeWorkspace = null; // Currently loaded workspace path
+let registryPath = null;       // Full path to projects.yml
+let activeProjectDir = null;   // Currently loaded project directory
 let boConfig = null;
 let projectState = null;
 
+// Helper: get .mimir/ workspace path from project dir
+function getMimirDir(projectDir) {
+  return path.join(projectDir, '.mimir');
+}
+
 // === Registry (projects.yml) ===
 
-function getDefaultRegistryDir() {
-  // Default: BO_TOOLS_DIR/.workspaces or fallback to sample
-  return process.env.BO_REGISTRY_DIR || path.join(__dirname, '..', '.workspaces');
+function getDefaultRegistryPath() {
+  // Default: {BO tools dir}/projects.yml
+  return process.env.BO_REGISTRY_PATH || path.join(__dirname, '..', 'projects.yml');
 }
 
 function getRegistryPath() {
-  if (!registryDir) registryDir = getDefaultRegistryDir();
-  return path.join(registryDir, 'projects.yml');
+  if (!registryPath) registryPath = getDefaultRegistryPath();
+  return registryPath;
+}
+
+function getRegistryDir() {
+  return path.dirname(getRegistryPath());
 }
 
 function loadRegistry() {
   const p = getRegistryPath();
-  if (!fs.existsSync(p)) return { registry_path: registryDir, projects: [] };
-  try { return yaml.load(fs.readFileSync(p, 'utf8')) || { registry_path: registryDir, projects: [] }; }
-  catch (e) { return { registry_path: registryDir, projects: [] }; }
+  if (!fs.existsSync(p)) return { projects: [] };
+  try { return yaml.load(fs.readFileSync(p, 'utf8')) || { projects: [] }; }
+  catch (e) { return { projects: [] }; }
 }
 
 function saveRegistry(reg) {
-  const dir = registryDir || getDefaultRegistryDir();
+  const dir = path.dirname(getRegistryPath());
   fs.mkdirSync(dir, { recursive: true });
-  reg.registry_path = dir;
-  fs.writeFileSync(path.join(dir, 'projects.yml'), yaml.dump(reg, { lineWidth: -1 }), 'utf8');
+  fs.writeFileSync(getRegistryPath(), yaml.dump(reg, { lineWidth: -1 }), 'utf8');
 }
 
 function enrichProject(proj) {
-  // Read live phase from project-state.json
-  const statePath = path.join(proj.workspace, 'project-state.json');
-  const configPath = path.join(proj.workspace, 'bo-config.yml');
+  // Read live phase from .mimir/state.json
+  const mimirDir = getMimirDir(proj.project_dir);
+  const statePath = path.join(mimirDir, 'state.json');
+  const configPath = path.join(mimirDir, 'config.yml');
   let phase = proj.phase || 'INIT';
   let updatedAt = proj.updated_at;
   let exists = fs.existsSync(configPath);
@@ -64,61 +73,132 @@ function enrichProject(proj) {
 
 // === Active project ===
 
-function setActiveWorkspace(wsPath) {
-  activeWorkspace = wsPath;
+function setActiveProject(projectDir) {
+  activeProjectDir = projectDir;
   boConfig = null;
   projectState = null;
-  if (wsPath) { loadConfig(); loadState(); }
+  if (projectDir) { loadConfig(); loadState(); }
 }
 
 function getWorkspacePath() {
-  return activeWorkspace;
+  return activeProjectDir ? getMimirDir(activeProjectDir) : null;
 }
 
 function loadConfig() {
-  if (!activeWorkspace) { boConfig = null; return null; }
-  const p = path.join(activeWorkspace, 'bo-config.yml');
+  if (!activeProjectDir) { boConfig = null; return null; }
+  const p = path.join(getMimirDir(activeProjectDir), 'config.yml');
   boConfig = fs.existsSync(p) ? yaml.load(fs.readFileSync(p, 'utf8')) : null;
   return boConfig;
 }
 
 function saveConfig(config) {
-  if (!activeWorkspace) return;
-  fs.mkdirSync(activeWorkspace, { recursive: true });
-  fs.writeFileSync(path.join(activeWorkspace, 'bo-config.yml'), yaml.dump(config, { lineWidth: -1 }), 'utf8');
+  if (!activeProjectDir) return;
+  const mimirDir = getMimirDir(activeProjectDir);
+  fs.mkdirSync(mimirDir, { recursive: true });
+  // Also create subdirectories
+  for (const sub of ['conventions', 'prompts', 'reports']) {
+    fs.mkdirSync(path.join(mimirDir, sub), { recursive: true });
+  }
+  fs.writeFileSync(path.join(mimirDir, 'config.yml'), yaml.dump(config, { lineWidth: -1 }), 'utf8');
   boConfig = config;
 }
 
 function loadState() {
-  if (!activeWorkspace) { projectState = null; return null; }
-  const p = path.join(activeWorkspace, 'project-state.json');
+  if (!activeProjectDir) { projectState = null; return null; }
+  const p = path.join(getMimirDir(activeProjectDir), 'state.json');
   projectState = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null;
   return projectState;
 }
 
 function saveState(state) {
-  if (!activeWorkspace) return;
-  fs.mkdirSync(activeWorkspace, { recursive: true });
+  if (!activeProjectDir) return;
+  const mimirDir = getMimirDir(activeProjectDir);
+  fs.mkdirSync(mimirDir, { recursive: true });
   state.updated_at = new Date().toISOString();
-  fs.writeFileSync(path.join(activeWorkspace, 'project-state.json'), JSON.stringify(state, null, 2), 'utf8');
+  fs.writeFileSync(path.join(mimirDir, 'state.json'), JSON.stringify(state, null, 2), 'utf8');
   projectState = state;
   broadcastWs({ type: 'state_updated', data: state });
 }
 
 // Register/update project in projects.yml
-function registerProject(name, workspace) {
+function registerProject(name, projectDir) {
   const reg = loadRegistry();
-  const idx = reg.projects.findIndex(p => p.workspace === workspace);
-  const entry = { name, workspace, phase: 'INIT', updated_at: new Date().toISOString(), pinned: false };
+  const idx = reg.projects.findIndex(p => p.project_dir === projectDir);
+  const entry = { name, project_dir: projectDir, phase: 'INIT', updated_at: new Date().toISOString(), pinned: false };
   if (idx >= 0) { reg.projects[idx] = { ...reg.projects[idx], name, updated_at: entry.updated_at }; }
   else { reg.projects.unshift(entry); }
   saveRegistry(reg);
 }
 
-function updateRegistryPhase(workspace, phase) {
+function updateRegistryPhase(projectDir, phase) {
   const reg = loadRegistry();
-  const proj = reg.projects.find(p => p.workspace === workspace);
+  const proj = reg.projects.find(p => p.project_dir === projectDir);
   if (proj) { proj.phase = phase; proj.updated_at = new Date().toISOString(); saveRegistry(reg); }
+}
+
+// === CLAUDE.md generation ===
+
+function generateClaudeMd(config, state) {
+  if (!activeProjectDir) return;
+  const currentPhase = state?.current_phase || 'INIT';
+  const currentModule = Object.entries(state?.phases?.BUILD?.modules || {})
+    .find(([, m]) => m.status === 'in_progress');
+  const moduleId = currentModule ? currentModule[0] : null;
+  const moduleStep = currentModule ? currentModule[1].sub_step : null;
+
+  const lines = [
+    `# Project: ${config.instance_name || 'Untitled'}`,
+    '# 由 MIMIR-BO 自动生成，请勿手动编辑',
+    `# 最后更新: ${new Date().toISOString()}`,
+    '',
+    '## 项目规范',
+    '',
+    '执行任务前，按需读取以下文件：',
+    '- 📋 MIMIR Skill Manifest: .mimir/skill-manifest.md',
+    '- 📐 Convention Snapshot: .mimir/conventions/latest.md',
+    '',
+    'Skill Manifest 中列出了本项目需要遵循的所有 MIMIR 规范文件路径。',
+    '按当前任务的相关性选择性读取，不需要全部加载。',
+    'Convention Snapshot 记录了前序模块中提取的代码约定，新模块必须遵循。',
+    '',
+    '## 当前任务',
+    '',
+    `当前阶段: ${currentPhase}`,
+  ];
+
+  if (moduleId) {
+    lines.push(`当前模块: ${moduleId}`);
+    lines.push(`模块状态: ${moduleStep || 'pending'}`);
+    lines.push('');
+    lines.push('### 模块 Prompt');
+    lines.push(`读取并执行: .mimir/prompts/${moduleId}/${moduleId}-prompt.md`);
+  }
+
+  // Design docs reference
+  const designDir = path.join(activeProjectDir, 'docs', 'design');
+  if (fs.existsSync(designDir)) {
+    lines.push('');
+    lines.push('### 设计文档参考');
+    try {
+      const files = fs.readdirSync(designDir).filter(f => f.endsWith('.md'));
+      files.forEach(f => lines.push(`- docs/design/${f}`));
+    } catch (e) {}
+  }
+
+  lines.push('');
+  lines.push('## Git 规范');
+  if (moduleId) {
+    lines.push(`- commit message: feat(${moduleId}): <描述>`);
+  } else {
+    lines.push('- commit message: feat(<module>): <描述>');
+  }
+  lines.push('- 不要修改不属于当前模块的文件');
+  lines.push('');
+  lines.push('## 用户自定义指令');
+  lines.push('如有个人编码偏好，请同时读取: .claude-user.md');
+  lines.push('');
+
+  fs.writeFileSync(path.join(activeProjectDir, 'CLAUDE.md'), lines.join('\n'), 'utf8');
 }
 
 // === Language-aware MIMIR path ===
@@ -180,7 +260,8 @@ function validateSkillDir(dirPath) {
 // === Skill Manifest ===
 
 function generateSkillManifest() {
-  if (!boConfig?.paths?.mimir || !activeWorkspace) return;
+  if (!boConfig?.paths?.mimir || !activeProjectDir) return;
+  const mimirDir = getMimirDir(activeProjectDir);
   const lang = boConfig.language === 'bilingual' ? 'zh' : (boConfig.language || 'zh');
   const base = path.join(boConfig.paths.mimir, lang);
   const scan = scanMimirContent(base);
@@ -201,7 +282,7 @@ function generateSkillManifest() {
     for (const dir of userDirs) { scanMimirContent(dir).files.forEach(f => lines.push(`| ${idx++} | ${f.path} | ${(f.size / 1024).toFixed(1)}KB |`)); }
   }
   lines.push('', '## 使用说明', '', '执行任务前，根据当前任务阶段和内容相关性，选择性读取上述文件。', '不需要全部读取，按需加载以节省 context window。', '');
-  fs.writeFileSync(path.join(activeWorkspace, 'skill-manifest.md'), lines.join('\n'), 'utf8');
+  fs.writeFileSync(path.join(mimirDir, 'skill-manifest.md'), lines.join('\n'), 'utf8');
 }
 
 // === File tree / design docs ===
@@ -210,7 +291,7 @@ function scanDirectory(dirPath, maxDepth = 3, depth = 0) {
   if (depth >= maxDepth || !fs.existsSync(dirPath)) return [];
   try {
     return fs.readdirSync(dirPath, { withFileTypes: true })
-      .filter(e => (!e.name.startsWith('.') || ['.user','.workspace','.workspaces'].includes(e.name))
+      .filter(e => (!e.name.startsWith('.') || ['.mimir','.claude-user.md'].includes(e.name))
         && !['node_modules','__pycache__','.git','.venv'].includes(e.name))
       .map(e => {
         const full = path.join(dirPath, e.name);
@@ -248,90 +329,88 @@ function scanDesignDocs(projectPath) {
 
 // === API: Project Registry ===
 
-app.get('/api/health', (_, res) => res.json({ status: 'ok', workspace: activeWorkspace, registryDir }));
+app.get('/api/health', (_, res) => res.json({ status: 'ok', projectDir: activeProjectDir, registryPath: getRegistryPath() }));
 
 // Get project list
 app.get('/api/projects', (_, res) => {
   const reg = loadRegistry();
   const projects = reg.projects.map(enrichProject);
-  res.json({ registryDir, projects });
+  res.json({ registryDir: getRegistryDir(), projects });
 });
 
 // Open/switch to a project
 app.post('/api/projects/open', (req, res) => {
-  const { workspace } = req.body;
-  if (!workspace) return res.status(400).json({ error: 'workspace required' });
-  if (!fs.existsSync(path.join(workspace, 'bo-config.yml'))) {
-    return res.status(404).json({ error: '目录中没有 bo-config.yml，不是有效的项目 workspace' });
+  const { project_dir } = req.body;
+  if (!project_dir) return res.status(400).json({ error: 'project_dir required' });
+  const mimirDir = getMimirDir(project_dir);
+  if (!fs.existsSync(path.join(mimirDir, 'config.yml'))) {
+    return res.status(404).json({ error: '目录中没有 .mimir/config.yml，不是有效的 MIMIR 项目' });
   }
-  setActiveWorkspace(workspace);
+  setActiveProject(project_dir);
   // Update registry (touch updated_at)
   const reg = loadRegistry();
-  const proj = reg.projects.find(p => p.workspace === workspace);
+  const proj = reg.projects.find(p => p.project_dir === project_dir);
   if (proj) { proj.updated_at = new Date().toISOString(); saveRegistry(reg); }
-  else { registerProject(boConfig?.instance_name || path.basename(workspace), workspace); }
+  else { registerProject(boConfig?.instance_name || path.basename(project_dir), project_dir); }
   res.json({ success: true, config: boConfig, state: projectState });
 });
 
-// Create new project workspace
+// Create new project
 app.post('/api/projects/create', (req, res) => {
-  const { workspace } = req.body;
-  if (!workspace) return res.status(400).json({ error: 'workspace required' });
-  fs.mkdirSync(workspace, { recursive: true });
-  setActiveWorkspace(workspace);
+  const { project_dir } = req.body;
+  if (!project_dir) return res.status(400).json({ error: 'project_dir required' });
+  const mimirDir = getMimirDir(project_dir);
+  fs.mkdirSync(mimirDir, { recursive: true });
+  setActiveProject(project_dir);
   res.json({ success: true });
 });
 
 // Close current project (go back to selector)
 app.post('/api/projects/close', (_, res) => {
-  setActiveWorkspace(null);
+  setActiveProject(null);
   res.json({ success: true });
 });
 
 // Remove from registry (not delete files)
 app.post('/api/projects/unregister', (req, res) => {
-  const { workspace } = req.body;
+  const { project_dir } = req.body;
   const reg = loadRegistry();
-  reg.projects = reg.projects.filter(p => p.workspace !== workspace);
+  reg.projects = reg.projects.filter(p => p.project_dir !== project_dir);
   saveRegistry(reg);
   res.json({ success: true });
 });
 
-// Delete project (remove files + unregister)
+// Delete project (remove .mimir/ + CLAUDE.md + unregister)
 app.post('/api/projects/delete', (req, res) => {
-  const { workspace } = req.body;
-  if (!workspace) return res.status(400).json({ error: 'workspace required' });
+  const { project_dir } = req.body;
+  if (!project_dir) return res.status(400).json({ error: 'project_dir required' });
   // Unregister
   const reg = loadRegistry();
-  reg.projects = reg.projects.filter(p => p.workspace !== workspace);
+  reg.projects = reg.projects.filter(p => p.project_dir !== project_dir);
   saveRegistry(reg);
-  // Delete workspace files
-  try {
-    for (const f of ['bo-config.yml', 'project-state.json', 'skill-manifest.md']) {
-      const fp = path.join(workspace, f);
-      if (fs.existsSync(fp)) fs.unlinkSync(fp);
-    }
-    // Try to remove dir if empty
-    try { fs.rmdirSync(workspace); } catch (e) {}
-  } catch (e) {}
-  if (activeWorkspace === workspace) setActiveWorkspace(null);
+  // Delete .mimir/ directory
+  const mimirDir = getMimirDir(project_dir);
+  try { fs.rmSync(mimirDir, { recursive: true, force: true }); } catch (e) {}
+  // Delete CLAUDE.md
+  try { const cm = path.join(project_dir, 'CLAUDE.md'); if (fs.existsSync(cm)) fs.unlinkSync(cm); } catch (e) {}
+  if (activeProjectDir === project_dir) setActiveProject(null);
   res.json({ success: true });
 });
 
 // Pin/unpin project
 app.post('/api/projects/pin', (req, res) => {
-  const { workspace, pinned } = req.body;
+  const { project_dir, pinned } = req.body;
   const reg = loadRegistry();
-  const proj = reg.projects.find(p => p.workspace === workspace);
+  const proj = reg.projects.find(p => p.project_dir === project_dir);
   if (proj) { proj.pinned = pinned; saveRegistry(reg); }
   res.json({ success: true });
 });
 
-// Update registry dir
+// Update registry path
 app.post('/api/projects/registry-dir', (req, res) => {
   const { dir } = req.body;
   if (!dir) return res.status(400).json({ error: 'dir required' });
-  registryDir = dir;
+  registryPath = path.join(dir, 'projects.yml');
   fs.mkdirSync(dir, { recursive: true });
   res.json({ success: true, registryDir: dir });
 });
@@ -339,7 +418,7 @@ app.post('/api/projects/registry-dir', (req, res) => {
 // === API: Active project ===
 
 app.get('/api/active', (_, res) => {
-  res.json({ workspace: activeWorkspace, hasProject: !!boConfig });
+  res.json({ project_dir: activeProjectDir, hasProject: !!boConfig });
 });
 
 app.get('/api/config', (_, res) => {
@@ -348,13 +427,13 @@ app.get('/api/config', (_, res) => {
 });
 
 app.post('/api/config', (req, res) => {
-  if (!activeWorkspace) return res.status(400).json({ error: 'No active project' });
+  if (!activeProjectDir) return res.status(400).json({ error: 'No active project' });
   try {
     saveConfig(req.body);
     if (req.body.paths?.mimir) generateSkillManifest();
     loadState();
     if (!projectState) {
-      saveState({
+      const initialState = {
         project: req.body.instance_name || 'untitled',
         current_phase: 'DESIGN',
         phases: {
@@ -364,10 +443,13 @@ app.post('/api/config', (req, res) => {
           VERIFY: { status: 'pending' },
           SHIP: { status: 'pending' },
         },
-      });
+      };
+      saveState(initialState);
+      // Generate CLAUDE.md on first init
+      generateClaudeMd(req.body, initialState);
     }
     // Update registry
-    registerProject(req.body.instance_name || 'untitled', activeWorkspace);
+    registerProject(req.body.instance_name || 'untitled', activeProjectDir);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -383,7 +465,7 @@ app.get('/api/state', (_, res) => {
 app.post('/api/state', (req, res) => {
   try {
     saveState(req.body);
-    if (activeWorkspace) updateRegistryPhase(activeWorkspace, req.body.current_phase);
+    if (activeProjectDir) updateRegistryPhase(activeProjectDir, req.body.current_phase);
     res.json({ success: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -437,6 +519,14 @@ app.post('/api/skills/regenerate-manifest', (_, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Regenerate CLAUDE.md (triggered on sub-step changes)
+app.post('/api/claude-md/regenerate', (_, res) => {
+  loadConfig(); loadState();
+  if (!boConfig || !projectState) return res.status(404).json({ error: 'Not initialized' });
+  try { generateClaudeMd(boConfig, projectState); res.json({ success: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // === API: OS folder picker ===
 
 app.get('/api/pick-folder', (req, res) => {
@@ -474,7 +564,7 @@ function deepMerge(t, s) {
 }
 
 // Startup
-registryDir = getDefaultRegistryDir();
+registryPath = getDefaultRegistryPath();
 server.listen(PORT, () => {
   console.log(`\n  🚀 MIMIR-BO Dashboard Server`);
   console.log(`  📡 http://localhost:${PORT}/api`);

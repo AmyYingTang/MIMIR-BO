@@ -7,8 +7,6 @@
         :basePath="config?.paths?.mimir" :defaultOpen="false" />
       <DirSection icon="🔧" :label="t.boToolsDir" color="#78716c"
         :basePath="config?.paths?.tools" :defaultOpen="false" />
-      <DirSection icon="📂" :label="t.workspaceDir" color="#2563eb"
-        :basePath="config?.paths?.workspace" :defaultOpen="true" />
       <DirSection icon="📁" :label="t.projectDir" color="#16a34a"
         :basePath="config?.paths?.project" :defaultOpen="true" />
     </template>

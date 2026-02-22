@@ -35,7 +35,7 @@
         </div>
 
         <div class="project-list">
-          <div v-for="proj in sortedProjects" :key="proj.workspace" class="project-card"
+          <div v-for="proj in sortedProjects" :key="proj.project_dir" class="project-card"
             :class="{ missing: !proj.exists }" @click="proj.exists && open(proj)">
             <div class="proj-left">
               <span class="proj-pin" @click.stop="togglePin(proj)" :title="proj.pinned ? t.unpin : t.pin">
@@ -49,7 +49,7 @@
                 {{ proj.phase }} · {{ timeAgo(proj.updated_at) }}
                 <span v-if="!proj.exists" class="proj-missing">{{ t.dirMissing }}</span>
               </div>
-              <div class="proj-path">{{ proj.workspace }}</div>
+              <div class="proj-path">{{ proj.project_dir }}</div>
             </div>
             <div class="proj-actions" @click.stop>
               <button class="btn-icon" @click="remove(proj)" :title="t.removeFromList">✕</button>
@@ -109,14 +109,14 @@ async function openExisting() {
 }
 
 function open(proj) {
-  api.openProject(proj.workspace)
-    .then(d => emit('open', proj.workspace, d.config, d.state))
+  api.openProject(proj.project_dir)
+    .then(d => emit('open', proj.project_dir, d.config, d.state))
     .catch(e => alert(e.message))
 }
-function togglePin(proj) { api.pinProject(proj.workspace, !proj.pinned).then(loadProjects) }
+function togglePin(proj) { api.pinProject(proj.project_dir, !proj.pinned).then(loadProjects) }
 function remove(proj) {
   if (!confirm(t.value.confirmRemove(proj.name))) return
-  api.unregisterProject(proj.workspace).then(loadProjects)
+  api.unregisterProject(proj.project_dir).then(loadProjects)
 }
 async function changeRegistryDir() {
   try {

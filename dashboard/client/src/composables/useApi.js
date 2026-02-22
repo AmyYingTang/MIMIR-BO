@@ -31,12 +31,12 @@ export function useApi() {
 
     // Project registry
     getProjects: () => call(() => fetchJson('/projects')),
-    openProject: (workspace) => call(() => fetchJson('/projects/open', { method: 'POST', body: JSON.stringify({ workspace }) })),
-    createProject: (workspace) => call(() => fetchJson('/projects/create', { method: 'POST', body: JSON.stringify({ workspace }) })),
+    openProject: (projectDir) => call(() => fetchJson('/projects/open', { method: 'POST', body: JSON.stringify({ project_dir: projectDir }) })),
+    createProject: (projectDir) => call(() => fetchJson('/projects/create', { method: 'POST', body: JSON.stringify({ project_dir: projectDir }) })),
     closeProject: () => call(() => fetchJson('/projects/close', { method: 'POST' })),
-    unregisterProject: (workspace) => call(() => fetchJson('/projects/unregister', { method: 'POST', body: JSON.stringify({ workspace }) })),
-    deleteProject: (workspace) => call(() => fetchJson('/projects/delete', { method: 'POST', body: JSON.stringify({ workspace }) })),
-    pinProject: (workspace, pinned) => call(() => fetchJson('/projects/pin', { method: 'POST', body: JSON.stringify({ workspace, pinned }) })),
+    unregisterProject: (projectDir) => call(() => fetchJson('/projects/unregister', { method: 'POST', body: JSON.stringify({ project_dir: projectDir }) })),
+    deleteProject: (projectDir) => call(() => fetchJson('/projects/delete', { method: 'POST', body: JSON.stringify({ project_dir: projectDir }) })),
+    pinProject: (projectDir, pinned) => call(() => fetchJson('/projects/pin', { method: 'POST', body: JSON.stringify({ project_dir: projectDir, pinned }) })),
     setRegistryDir: (dir) => call(() => fetchJson('/projects/registry-dir', { method: 'POST', body: JSON.stringify({ dir }) })),
     getActive: () => call(() => fetchJson('/active')),
 
@@ -69,5 +69,8 @@ export function useApi() {
 
     // Skills
     regenerateManifest: () => call(() => fetchJson('/skills/regenerate-manifest', { method: 'POST' })),
+
+    // CLAUDE.md
+    regenerateClaudeMd: () => call(() => fetchJson('/claude-md/regenerate', { method: 'POST' })),
   }
 }

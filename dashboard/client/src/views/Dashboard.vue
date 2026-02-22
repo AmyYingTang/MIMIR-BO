@@ -26,6 +26,7 @@
         <!-- INIT panels -->
         <InitPanel v-if="selected?.startsWith('INIT')"
           :readonly="isInitialized" :existingConfig="config" :selected="selected"
+          :projectDir="activeProjectDir"
           @initialized="onInitialized" @backToProjects="closeProject" />
 
         <!-- Overview -->
@@ -49,6 +50,7 @@
 
         <!-- Default -->
         <InitPanel v-else-if="!isInitialized" :selected="selected"
+          :projectDir="activeProjectDir"
           @initialized="onInitialized" @backToProjects="closeProject" />
         <OverviewPanel v-else :state="state" :config="config" />
       </div>
@@ -77,6 +79,7 @@ const ws = useWebSocket()
 const { t, lang } = useI18n()
 
 const hasActiveProject = ref(false)
+const activeProjectDir = ref(null)
 const config = ref(null)
 const state = ref(null)
 const selected = ref('INIT_basic')
@@ -98,7 +101,8 @@ const currentModule = computed(() => modules.value.find(m => m.id === activeModu
 function onSelect(nodeId) { selected.value = nodeId }
 
 // Project opened from selector (existing project)
-async function onProjectOpen(workspace, cfg, st) {
+async function onProjectOpen(projectDir, cfg, st) {
+  activeProjectDir.value = projectDir
   config.value = cfg
   state.value = st
   hasActiveProject.value = true
@@ -112,7 +116,8 @@ async function onProjectOpen(workspace, cfg, st) {
 }
 
 // New project created from selector
-async function onProjectCreate(workspace) {
+async function onProjectCreate(projectDir) {
+  activeProjectDir.value = projectDir
   hasActiveProject.value = true
   config.value = null
   state.value = {
@@ -133,6 +138,7 @@ async function onInitialized() {
 async function closeProject() {
   try { await api.closeProject() } catch (e) {}
   hasActiveProject.value = false
+  activeProjectDir.value = null
   config.value = null
   state.value = null
   selected.value = 'INIT_basic'
@@ -148,7 +154,8 @@ onMounted(async () => {
   // Check if there's an active project from a previous session
   try {
     const active = await api.getActive()
-    if (active.hasProject && active.workspace) {
+    if (active.hasProject && active.project_dir) {
+      activeProjectDir.value = active.project_dir
       config.value = await api.getConfig()
       state.value = await api.getState()
       hasActiveProject.value = true
