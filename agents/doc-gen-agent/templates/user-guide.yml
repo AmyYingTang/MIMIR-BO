@@ -1,82 +1,79 @@
-# User Guide 骨架模板
-# doc-gen-agent 根据此模板生成文档结构
-# 每个页面定义：文件路径、依赖的源文档、角色描述、填充批次
+# User Guide 骨架模板（Generic）
+#
+# 本模板定义 user-guide 类型文档的页面结构和通用提取逻辑。
+# 不包含任何项目特定内容（如章节号、具体字段名、角色名等）。
+# 项目特定的提取指令由 Step 2 (skeleton) 结合 analyze report 动态生成。
 
 doc_type: user-guide
 description: 面向平台终端用户的操作指南
 
 pages:
-  # --- 第1批：数据提取页（可并行）---
+  # ═══════════════════════════════════════
+  # 第1批：参考数据页（可并行）
+  # ═══════════════════════════════════════
+
   - path: reference/limits.md
     sources: [business_rules, api_design]
     role: 配额与限制速查表
     batch: 1
     extract_strategy: |
-      从 business_rules 提取所有用户可感知的配额数值
-      从 api_design 提取文件上传限制、文本长度限制
-      转化为表格形式，禁止暴露 API 路径
+      提取所有用户可感知的配额和限制数值
+      包括：文件大小限制、操作频率限制、数量上限等
+      转化为表格形式，禁止暴露 API 路径或内部字段名
 
   - path: reference/permissions.md
     sources: [security_arch, api_design]
     role: 角色与权限说明
     batch: 1
     extract_strategy: |
-      从 security_arch 提取角色定义和权限矩阵
-      从 api_design 提取各操作的权限要求
+      提取所有角色定义和各角色可执行的操作
       转化为 ✅/❌ 矩阵表格
+      用用户可理解的操作名称替代技术端点名
 
   - path: reference/status-guide.md
     sources: [state_machines, database_design]
-    role: 模型状态含义速查
+    role: 核心状态含义速查
     batch: 1
     extract_strategy: |
-      从 state_machines 提取所有状态定义和流转规则
-      从 database_design 提取 retry_count, expires_at 等字段语义
+      提取所有用户可见的状态定义和流转规则
       简化为用户视角的状态说明表 + 文本流程图
+      隐藏系统内部状态，只展示用户可感知的状态
 
-  # --- 第2批：操作指南页（建议按顺序）---
-  - path: guides/model-create.md
-    sources: [api_design, business_rules]
-    role: 创建语音模型操作指南
-    batch: 2
-    extract_strategy: |
-      从 api_design 的创建端点提取字段定义，转化为用户语言
-      从 business_rules 提取音频要求、创建限制
-      字段名用中文，必填/选填从 API required 字段推断
+  # ═══════════════════════════════════════
+  # 第2批：操作指南页（建议按用户核心流程顺序）
+  # ═══════════════════════════════════════
+  #
+  # 🔧 本节的页面列表由 Step 2 根据 analyze report 动态确定。
+  # 以下是 user-guide 的通用页面模式，agent 应根据项目实际功能
+  # 增删页面，但保持以下原则：
+  #   - 每个核心用户操作流程对应一个 guide 页面
+  #   - 页面按用户操作流程的自然顺序排列
+  #   - 每页聚焦一个完整操作（创建→提交→等待→获取结果）
+  #
+  # 通用页面模式（agent 按项目实际功能生成具体页面）：
+  #   guides/create-*.md    — 创建类操作
+  #   guides/process-*.md   — 流程类操作（含等待和状态变化）
+  #   guides/test-*.md      — 测试/验证类操作
+  #   guides/manage-*.md    — 管理类操作（查看/编辑/删除）
+  #
+  # 每页的 extract_strategy 通用原则：
+  #   - 从 api_design 提取操作字段，转化为用户语言
+  #   - 从 business_rules 提取约束和限制
+  #   - 从 state_machines 提取用户可见的状态变化
+  #   - 字段名用中文，必填/选填从 API required 推断
+  #   - 操作步骤用动词开头
 
-  - path: guides/model-train.md
-    sources: [state_machines, business_rules, database_design]
-    role: 模型训练流程与状态说明
-    batch: 2
-    extract_strategy: |
-      从 state_machines 简化为用户视角的线性流程
-      从 business_rules 提取重试策略、取消规则、超时设置
-      从 database_design 的 retry_count 推导重试上限说明
+  # ═══════════════════════════════════════
+  # 第3批：综合页（必须串行，依赖前两批）
+  # ═══════════════════════════════════════
 
-  - path: guides/model-test.md
-    sources: [api_design, business_rules]
-    role: 试听与测试操作指南
-    batch: 2
-    extract_strategy: |
-      从 api_design 的试听端点提取功能说明
-      从 business_rules 提取文本长度限制、试听配额
-
-  - path: guides/model-manage.md
-    sources: [api_design, business_rules, database_design]
-    role: 模型管理（查看/编辑/删除）
-    batch: 2
-    extract_strategy: |
-      从 api_design 的 CRUD 端点推断可编辑字段
-      从 business_rules 提取删除规则、过期策略
-      从 database_design 的 expires_at 推导过期说明
-
-  # --- 第3批：综合页（必须串行）---
   - path: quickstart.md
     sources: [synthesized]
-    role: 3分钟快速上手
+    role: 快速上手（3-5分钟）
     batch: 3
     extract_strategy: |
-      从已填充的 model-create + model-train + model-test 页面提炼精简版
+      从已填充的操作指南页面提炼核心操作流程的精简版
+      覆盖用户最典型的端到端操作路径
       每步最多 3-4 句话
       具体数值从已填充页面提取，确保一致
 
@@ -85,8 +82,8 @@ pages:
     role: 常见问题解答
     batch: 3
     extract_strategy: |
-      从所有已填充页面的 admonition 反向提取用户困惑
-      从限制和边界条件生成 FAQ
+      从所有已填充页面的 admonition 和边界条件反向生成 FAQ
+      按功能场景分组
       每个分类 3-5 个问题，总计不超过 20 个
 
   - path: index.md
@@ -94,6 +91,7 @@ pages:
     role: 首页概览与导航
     batch: 3
     extract_strategy: |
-      根据已填充页面微调措辞
+      平台功能概览，按用户核心操作流程组织
       功能卡片描述从各 guide 页面的概述提炼
       确保与 quickstart 步骤一致
+      包含各页面的导航链接

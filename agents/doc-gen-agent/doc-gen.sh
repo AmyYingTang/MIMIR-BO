@@ -6,7 +6,7 @@
 #   ./doc-gen.sh <config-file> [step] [project-dir]
 #
 #   config-file : doc-gen.yml 配置文件路径
-#   step        : all | analyze | skeleton | fill | qa  (默认: all)
+#   step        : all | analyze | skeleton | fill | qa | build  (默认: all)
 #   project-dir : 项目根目录 (默认: 当前目录)
 #
 # 示例:
@@ -67,6 +67,10 @@ SOURCE_DOCS=$(parse_source_docs)
 TONE=$(grep -A10 "^writing_rules:" "$CONFIG" | grep "tone:" | sed 's/.*tone:[[:space:]]*//' | tr -d "'\"" || echo "friendly-professional")
 NO_TECH=$(grep -A10 "^writing_rules:" "$CONFIG" | grep "no_technical_terms:" | sed 's/.*no_technical_terms:[[:space:]]*//' || echo "true")
 UNKNOWN_MARKER=$(grep -A10 "^writing_rules:" "$CONFIG" | grep "unknown_value_marker:" | sed 's/.*unknown_value_marker:[[:space:]]*//' | tr -d "'\"" || echo "[待确认]")
+
+# auto_build: true 时跳过中间暂停，分析→骨架→填充→自检→构建一气呵成
+AUTO_BUILD=$(get_yaml "auto_build")
+[ -z "$AUTO_BUILD" ] && AUTO_BUILD="false"
 
 # 确保输出目录存在
 OUTPUT_PATH="${PROJECT_DIR}/${OUTPUT_DIR}"
@@ -159,6 +163,9 @@ echo "  输出格式 : $OUTPUT_FORMAT"
 echo "  输出目录 : $OUTPUT_PATH"
 echo "  项目目录 : $PROJECT_DIR"
 echo "  执行步骤 : $STEP"
+if [ "$AUTO_BUILD" = "true" ]; then
+    echo "  自动构建 : ✅ 跳过中间暂停，直接输出站点"
+fi
 echo ""
 echo "源文档:"
 build_source_list
@@ -294,8 +301,12 @@ ${SOURCE_REFS}
 每个 TODO 必须标明：从哪个源文档、提取什么内容、转化为什么形式。
 保留截图占位标记: <!-- TODO: 截图 — 描述 -->
 
-### 2. mkdocs.yml
-在 ${OUTPUT_PATH}/ 下生成 mkdocs.yml 配置，使用 Material 主题，支持中文搜索。
+### 2. 站点配置
+$(if [ "$OUTPUT_FORMAT" = "mkdocs" ]; then
+echo "在 ${OUTPUT_PATH}/ 下生成 mkdocs.yml 配置，使用 Material 主题，支持中文搜索。"
+elif [ "$OUTPUT_FORMAT" = "single-html" ]; then
+echo "不需要生成 mkdocs.yml。输出格式为单文件 HTML，构建脚本会自动读取 fill-order.md 来确定页面顺序和导航结构。"
+fi)
 
 ### 3. 填充顺序
 在 ${OUTPUT_PATH}/fill-order.md 中定义三批执行顺序：
@@ -403,7 +414,7 @@ run_qa() {
         echo "  ⚠️  自检报告未生成"
     fi
 
-    # 构建（如果是 mkdocs 格式）
+    # 构建
     if [ "$OUTPUT_FORMAT" = "mkdocs" ]; then
         echo ""
         echo "🔨 构建 MkDocs 站点..."
@@ -414,49 +425,105 @@ run_qa() {
             echo "  ⚠️  mkdocs 未安装，跳过构建"
             echo "  安装: pipx install mkdocs==1.6.1 && pipx inject mkdocs mkdocs-material"
         fi
+    elif [ "$OUTPUT_FORMAT" = "single-html" ]; then
+        echo ""
+        echo "🔨 构建单文件 HTML..."
+        local doc_title="${DOC_TYPE}"
+        # 从配置文件中获取实例名（如果有的话）
+        local instance_name=$(get_yaml "title")
+        [ -n "$instance_name" ] && doc_title="$instance_name"
+        python3 "${SCRIPT_DIR}/single-html-build.py" "$OUTPUT_PATH" "$doc_title"
     fi
 
+    echo ""
+}
+
+# ─── 单独构建（不含自检）───
+run_build() {
+    echo "🔨 构建文档..."
+    echo ""
+
+    if [ "$OUTPUT_FORMAT" = "mkdocs" ]; then
+        if ! command -v mkdocs >/dev/null 2>&1; then
+            echo "  ❌ mkdocs 未安装"
+            echo "  安装: pipx install mkdocs==1.6.1 && pipx inject mkdocs mkdocs-material"
+            exit 1
+        fi
+        if [ ! -f "${OUTPUT_PATH}/mkdocs.yml" ]; then
+            echo "  ❌ mkdocs.yml 不存在: ${OUTPUT_PATH}/mkdocs.yml"
+            echo "  请先运行 skeleton 步骤"
+            exit 1
+        fi
+        (cd "$OUTPUT_PATH" && mkdocs build 2>&1 | tail -10)
+        echo ""
+        echo "  ✅ 站点输出: ${OUTPUT_PATH}/site/"
+        echo "  💡 预览: cd ${OUTPUT_PATH} && mkdocs serve"
+
+    elif [ "$OUTPUT_FORMAT" = "single-html" ]; then
+        local doc_title="${DOC_TYPE}"
+        local instance_name=$(get_yaml "title")
+        [ -n "$instance_name" ] && doc_title="$instance_name"
+        python3 "${SCRIPT_DIR}/single-html-build.py" "$OUTPUT_PATH" "$doc_title"
+        echo "  💡 双击 HTML 文件即可在浏览器中查看"
+
+    else
+        echo "  ⚠️  未知的 output_format: ${OUTPUT_FORMAT}"
+        echo "  支持: mkdocs | single-html"
+    fi
     echo ""
 }
 
 # ─── 执行 ───
 case "$STEP" in
     all)
-        run_analyze
-        echo "────────────────────────────────────"
-        run_skeleton
-        echo "────────────────────────────────────"
-        echo "⏸  骨架已生成，建议先 review 再继续填充。"
-        read -p "   继续填充？(y/n) " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [ "$AUTO_BUILD" = "true" ]; then
+            # 自动模式：全程无暂停
+            run_analyze
+            echo "────────────────────────────────────"
+            run_skeleton
             echo "────────────────────────────────────"
             run_fill
             echo "────────────────────────────────────"
-            echo "⏸  内容填充完成。现在可以："
-            echo "     - 补充 UI 截图到 ${OUTPUT_PATH}/docs/images/"
-            echo "     - 人工审校填充内容"
-            echo "     - 修改任何不满意的页面"
-            echo ""
-            read -p "   继续自检+构建？(y/n) " -n 1 -r
+            run_qa
+        else
+            # 交互模式：保留暂停点
+            run_analyze
+            echo "────────────────────────────────────"
+            run_skeleton
+            echo "────────────────────────────────────"
+            echo "⏸  骨架已生成，建议先 review 再继续填充。"
+            read -p "   继续填充？(y/n) " -n 1 -r
             echo ""
             if [[ $REPLY =~ ^[Yy]$ ]]; then
                 echo "────────────────────────────────────"
-                run_qa
+                run_fill
+                echo "────────────────────────────────────"
+                echo "⏸  内容填充完成。现在可以："
+                echo "     - 补充 UI 截图到 ${OUTPUT_PATH}/docs/images/"
+                echo "     - 人工审校填充内容"
+                echo "     - 修改任何不满意的页面"
+                echo ""
+                read -p "   继续自检+构建？(y/n) " -n 1 -r
+                echo ""
+                if [[ $REPLY =~ ^[Yy]$ ]]; then
+                    echo "────────────────────────────────────"
+                    run_qa
+                else
+                    echo "   已暂停。后续执行: $0 $CONFIG qa $PROJECT_DIR"
+                fi
             else
-                echo "   已暂停。后续执行: $0 $CONFIG qa $PROJECT_DIR"
+                echo "   已暂停。后续执行: $0 $CONFIG fill $PROJECT_DIR"
             fi
-        else
-            echo "   已暂停。后续执行: $0 $CONFIG fill $PROJECT_DIR"
         fi
         ;;
     analyze)  run_analyze ;;
     skeleton) run_skeleton ;;
     fill)     run_fill ;;
     qa)       run_qa ;;
+    build)    run_build ;;
     *)
         echo "❌ 未知步骤: $STEP"
-        echo "   可选: all | analyze | skeleton | fill | qa"
+        echo "   可选: all | analyze | skeleton | fill | qa | build"
         exit 1
         ;;
 esac

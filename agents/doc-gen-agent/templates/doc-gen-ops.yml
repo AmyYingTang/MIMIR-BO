@@ -1,0 +1,39 @@
+# doc-gen-ops.yml — Ops Manual 生成配置
+#
+# 用法: ./doc-gen-agent/doc-gen.sh ./doc-gen-ops.yml analyze ~/your-project
+
+# === 固定配置（本文件专用）===
+doc_type: ops-manual
+audience: ops
+
+# === 项目配置（按项目修改）===
+language: zh
+output_format: single-html
+auto_build: false
+
+# === 源文档路径（相对于 project-dir）===
+source_docs:
+  deployment_guide: docs/deployment-guide.md
+  api_design: docs/design/api-design.md
+  security_arch: docs/design/security-architecture.md
+
+# === 输出路径 ===
+# work_dir: 默认 {agent目录}/.work/ops-manual/
+# work_dir: /path/to/custom/workdir
+output_dir: docs/ops-manual
+
+# === 写作约束 ===
+writing_rules:
+  tone: formal
+  no_technical_terms: false
+  max_admonition_length: 3
+  screenshot_placeholders: false
+  unknown_value_marker: '[待确认]'
+
+# === 站点元信息 ===
+site:
+  name: ''
+  description: ''
+  theme: material
+  logo: ''
+  color_primary: '#3f51b5'

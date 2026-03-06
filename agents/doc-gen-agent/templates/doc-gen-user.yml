@@ -1,0 +1,47 @@
+# doc-gen-user.yml — User Guide 生成配置
+#
+# 用法: ./doc-gen-agent/doc-gen.sh ./doc-gen-user.yml analyze ~/your-project
+
+# === 固定配置（本文件专用）===
+doc_type: user-guide
+audience: end-user
+
+# === 项目配置（按项目修改）===
+language: zh
+output_format: single-html     # single-html | mkdocs | markdown-only
+auto_build: false               # true=all模式跳过暂停 | false=skeleton后暂停review
+
+# === 源文档路径（相对于 project-dir）===
+source_docs:
+  prd: docs/design/prd.md
+  api_design: docs/design/api-design.md
+  database_design: docs/design/database-design.md
+  state_machines: docs/design/state-machines.md
+  business_rules: docs/design/business-rules.md
+  security_arch: docs/design/security-architecture.md
+
+# === 输出路径 ===
+# work_dir: 中间产物（分析报告、prompts、骨架 .md、qa 报告）
+#   默认: {agent目录}/.work/{doc_type}/
+#   取消注释可自定义:
+# work_dir: /path/to/custom/workdir
+
+# output_dir: 最终交付物（single-html 或 site/）
+#   相对于 project-dir
+output_dir: docs/user-guide
+
+# === 写作约束 ===
+writing_rules:
+  tone: friendly-professional
+  no_technical_terms: true
+  max_admonition_length: 3
+  screenshot_placeholders: true
+  unknown_value_marker: '[待确认]'
+
+# === 站点元信息 ===
+site:
+  name: ''
+  description: ''
+  theme: material
+  logo: ''
+  color_primary: '#3f51b5'

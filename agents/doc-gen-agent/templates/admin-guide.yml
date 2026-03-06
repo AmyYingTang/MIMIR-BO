@@ -1,52 +1,44 @@
-# Admin Guide 骨架模板
-# 面向平台管理员（Admin / SuperAdmin），覆盖全部管理功能
+# Admin Guide 骨架模板（Generic）
+#
+# 本模板定义 admin-guide 类型文档的页面结构和通用提取逻辑。
+# 不包含任何项目特定内容（如章节号、具体角色名、端点列表等）。
+# 项目特定的提取指令由 Step 2 (skeleton) 结合 analyze report 动态生成。
 
 doc_type: admin-guide
 description: 面向平台管理员的完整管理操作指南
 
 pages:
   # ═══════════════════════════════════════
-  # 第1批：数据提取页（可并行）
+  # 第1批：参考数据页（可并行）
   # ═══════════════════════════════════════
 
   - path: reference/role-matrix.md
-    sources: [prd, api_design, business_rules, state_machines]
+    sources: [security_arch, api_design, business_rules]
     role: 角色定义与完整权限矩阵
     batch: 1
     extract_strategy: |
-      从 prd §3.1 提取三种角色定义（SuperAdmin/Admin/User）和创建方式
-      从 prd §3.2 提取全局权限矩阵和用户级权限矩阵
-      从 api_design §3.4 提取各端点的权限装饰器要求
-      从 business_rules §2.3 提取 Admin 权限类型说明（user_management/chip_management）
-      从 state_machines §2.4 提取任务操作权限矩阵（User/Admin/SuperAdmin/System）
+      提取所有角色定义、创建方式、层级关系
+      提取各管理端点的权限要求
       合并为一张完整的操作-角色权限矩阵
-      注：security_arch 未提供，安全相关细节标记 [待确认]
+      比 user-guide 的权限页更详细，包含管理员特有操作
 
   - path: reference/api-reference.md
     sources: [api_design]
     role: 管理相关 API 参考
     batch: 1
     extract_strategy: |
-      从 api_design 提取管理员专用端点，按模块分组：
-      - §4.2 用户管理（审核/创建/禁用/密码重置）
-      - §4.3 芯片管理（厂家/芯片/功能 CRUD）
-      - §4.5.7-4.5.12 任务管理（取消/重试/日志/标记/列表）
-      - §4.6 Admin 管理（Admin 创建/权限配置）
-      - §4.7 系统配置/SMTP/消息/健康检查
-      - §4.8 操作日志
+      提取管理员专用端点，按功能模块分组
       允许展示端点路径和参数（audience=admin 允许管理概念）
-      禁止暴露实现细节（ORM、JWT payload 结构、中间件）
+      禁止暴露实现细节（ORM、token 结构、中间件）
 
   - path: reference/status-guide.md
-    sources: [state_machines, database_design, prd]
-    role: 用户/任务/模型状态速查
+    sources: [state_machines, database_design]
+    role: 全部实体状态速查
     batch: 1
     extract_strategy: |
-      从 state_machines §1 提取用户状态定义和流转规则（含操作者）
-      从 state_machines §2 提取任务状态定义和 Admin 可执行操作
-      从 state_machines §3 提取模型文件生命周期（有效→过期→清理）
-      从 state_machines §4 提取模型测试状态
-      从 database_design §5.1 提取各枚举值的中文名
+      提取系统中所有实体的状态定义和流转规则
+      标注每个状态转换的操作者（用户/管理员/系统）
+      标注管理员可执行的操作
       转化为管理员视角的状态说明表 + 简化流程图
 
   - path: reference/error-codes.md
@@ -54,149 +46,38 @@ pages:
     role: 错误码参考表
     batch: 1
     extract_strategy: |
-      从 api_design §5 提取完整错误码表
-      筛选管理员可能遇到的错误码（重点：40050-40054 任务操作错误）
-      按场景分组：认证错误、权限错误、用户管理错误、任务操作错误、系统错误
-      每个错误码附简要说明和建议操作
+      提取完整错误码表
+      筛选管理员可能遇到的错误码
+      按场景分组，每个错误码附简要说明和建议操作
 
   # ═══════════════════════════════════════
-  # 第2批：操作指南页（建议按功能流程顺序）
+  # 第2批：操作指南页（建议按管理工作流顺序）
   # ═══════════════════════════════════════
-
-  - path: guides/system-init.md
-    sources: [deployment_guide, prd, business_rules, database_design]
-    role: 系统初始化与首次配置
-    batch: 2
-    extract_strategy: |
-      从 deployment_guide §3.7 提取首次部署后的初始化流程概述
-      从 prd §3.1 提取首个 SuperAdmin 创建说明
-      从 database_design §3.6.1 提取系统配置初始值清单
-      从 business_rules 提取初始配置项（SMTP、过期天数等）
-      用管理员视角描述："运维团队完成部署后，你需要…"
-      包含：首次登录→修改密码→配置 SMTP→创建 Admin 账号→分配权限
-      禁止暴露 docker/bash 命令，仅描述管理员在 UI 上的操作
-
-  - path: guides/user-management.md
-    sources: [api_design, prd, business_rules, state_machines]
-    role: 用户审核与账户管理
-    batch: 2
-    extract_strategy: |
-      从 prd §4.1 提取用户管理模块功能清单
-      从 business_rules §1.1 提取注册字段校验规则
-      从 business_rules §1.2 提取审核规则（拒绝原因≥10字符）
-      从 business_rules §1.3 提取 Admin 创建用户规则（默认 active）
-      从 state_machines §1 提取用户状态流转规则和操作者
-      从 api_design §4.2 提取用户管理端点
-      操作指南覆盖：查看待审核列表、审核通过/拒绝、创建用户、禁用/启用、重置密码、查看详情
-
-  - path: guides/chip-management.md
-    sources: [prd, api_design]
-    role: 芯片厂家与芯片管理
-    batch: 2
-    extract_strategy: |
-      从 prd §4.2 提取芯片管理模块功能（厂家 CRUD、芯片 CRUD、功能配置）
-      从 api_design §4.3 提取芯片管理端点
-      操作指南覆盖：创建/编辑/删除芯片厂家、创建/编辑/删除芯片、为芯片配置功能类型
-      说明芯片与功能的关系（一个芯片可支持多种功能类型）
-
-  - path: guides/permission-assignment.md
-    sources: [prd, api_design, business_rules]
-    role: 权限分配操作
-    batch: 2
-    extract_strategy: |
-      从 prd §4.3 提取权限分配模块设计
-      从 prd §3.2 提取用户级权限矩阵
-      从 business_rules §2.1-2.2 提取两层权限校验逻辑和全量覆盖模式
-      从 api_design §4.2.7-4.2.8 提取权限分配端点
-      操作指南覆盖：查看用户当前权限、分配芯片+功能组合权限、批量操作
-      重点说明全量覆盖模式的含义（每次提交覆盖之前的权限，不是增量）
-
-  - path: guides/task-queue.md
-    sources: [prd, api_design, business_rules, state_machines]
-    role: 任务队列管理
-    batch: 2
-    extract_strategy: |
-      从 prd §4.8.3 提取任务队列管理功能清单
-      从 state_machines §2 提取任务状态定义和 Admin 可执行操作（§2.5 get_allowed_actions）
-      从 business_rules §4 提取任务操作校验逻辑：
-      - §4.1 取消任务的前提条件
-      - §4.2 重试任务的规则
-      - §4.3 手动标记状态的使用场景（Pipeline 回调失败/卡死/状态不同步）
-      - §4.4 查看任务日志
-      从 api_design §4.5.7-4.5.12 提取任务管理端点
-      从 business_rules §3.3 提取并发数（5）和超时（48h）配置
-
-  - path: guides/model-files.md
-    sources: [prd, business_rules, state_machines, database_design]
-    role: 模型文件生命周期管理
-    batch: 2
-    extract_strategy: |
-      从 state_machines §3 提取模型文件生命周期（有效→过期→清理）
-      从 business_rules §6.1 提取文件命名规则
-      从 business_rules §6.2 提取过期策略（默认365天、支持-1永不过期、过期后7天清理）
-      从 prd §4.5.4-4.5.5 提取下载与管理功能
-      从 database_design expires_at 字段说明 null=永不过期
-      操作指南覆盖：查看模型文件列表、下载、查看有效期、理解过期清理机制
-
-  - path: guides/notifications.md
-    sources: [prd, api_design, business_rules, database_design]
-    role: 站内消息与邮件通知
-    batch: 2
-    extract_strategy: |
-      从 prd §4.6 提取通知模块设计（事件列表、SMTP 配置项）
-      从 api_design §4.7.5-4.7.8 提取站内消息端点（查看/已读/未读计数）
-      从 business_rules §7.1 提取消息路由规则（USER→ADMIN、ADMIN→SUPER_ADMIN）
-      从 database_design §3.8.1 提取消息表结构（转化为消息字段含义）
-      操作指南覆盖：查看站内消息、标记已读、理解消息路由机制、SMTP 配置
-
-  - path: guides/proxy-operations.md
-    sources: [business_rules, api_design]
-    role: Admin 代操作
-    batch: 2
-    extract_strategy: |
-      从 business_rules §8 提取 Admin 代操作规则和范围：
-      - 代用户创建文件夹
-      - 代用户提交训练任务
-      - 代用户查看芯片与功能
-      从 api_design 各端点的 user_id 参数提取代操作方式
-      说明代操作的约束：操作记录归属被代理用户、审计日志记录实际操作者
-
-  - path: guides/audit-logs.md
-    sources: [api_design, database_design, prd]
-    role: 审计日志查看与分析
-    batch: 2
-    extract_strategy: |
-      从 prd §4.9 提取审计日志记录范围
-      从 api_design §4.8 提取审计日志查询端点和筛选参数
-      从 database_design §3.7.1 提取 operation_logs 表字段含义
-      从 database_design §5 提取数据字典枚举值
-      操作指南覆盖：查看操作日志列表、按时间/用户/操作类型筛选
-      说明当前仅支持列表查看，导出功能标记 [待确认]
-
-  - path: guides/system-config.md
-    sources: [business_rules, api_design, database_design, prd]
-    role: 系统配置与参数管理
-    batch: 2
-    extract_strategy: |
-      从 database_design §3.6.1 提取系统配置项完整清单和默认值
-      从 api_design §4.7.1-4.7.4 提取配置管理端点和 SMTP 测试端点
-      从 business_rules §3.2 提取模型大小配置驱动规则
-      从 business_rules §6.2 提取下载有效期配置
-      从 prd §4.6.2 提取 SMTP 配置项列表
-      从 api_design §6 提取功能开关配置
-      操作指南覆盖：查看/修改系统参数、配置 SMTP、测试邮件发送、功能开关管理
-
-  - path: guides/monitoring.md
-    sources: [api_design, deployment_guide]
-    role: 系统监控与健康状态
-    batch: 2
-    extract_strategy: |
-      从 api_design §4.7.9 提取健康检查端点和返回值含义
-      从 api_design §4.5.7 提取任务队列状态查看方式
-      从 deployment_guide §7.3 概述健康检查机制（用管理员语言，不贴命令）
-      从 deployment_guide §9 提取常见故障现象（转化为管理员可感知的异常）
-      说明什么情况下需要联系运维团队
-      禁止暴露 docker compose 命令细节
+  #
+  # 🔧 本节的页面列表由 Step 2 根据 analyze report 动态确定。
+  # 以下是 admin-guide 的通用页面模式，agent 应根据项目实际
+  # 管理功能增删页面，但保持以下原则：
+  #   - 按管理员日常工作流顺序组织
+  #   - 首页应为系统初始化（首次配置流程）
+  #   - 每个管理功能模块对应一个 guide 页面
+  #
+  # 通用页面模式（agent 按项目实际功能生成具体页面）：
+  #   guides/system-init.md        — 系统初始化与首次配置
+  #   guides/user-management.md    — 用户/账户管理
+  #   guides/permission-*.md       — 权限分配与管理
+  #   guides/content-*.md          — 业务内容管理
+  #   guides/task-*.md             — 任务/队列管理
+  #   guides/system-config.md      — 系统配置与参数
+  #   guides/audit-*.md            — 审计与日志
+  #   guides/monitoring.md         — 监控与健康状态
+  #   guides/notifications.md      — 通知与消息管理
+  #
+  # 每页的 extract_strategy 通用原则：
+  #   - 从 api_design 提取管理端点，允许管理概念
+  #   - 从 business_rules 提取管理相关约束和校验规则
+  #   - 从 state_machines 提取管理员可执行的状态操作
+  #   - 禁止暴露实现细节（SQL、ORM、JWT 结构）
+  #   - 操作指南用管理员视角描述
 
   # ═══════════════════════════════════════
   # 第3批：综合页（必须串行，依赖前两批）
@@ -207,26 +88,18 @@ pages:
     role: 管理员快速上手
     batch: 3
     extract_strategy: |
-      从已填充的 system-init + user-management + system-config 页面提炼
-      聚焦管理员首次登录后的 5 个核心操作：
-      1. 首次登录与修改密码
-      2. 配置 SMTP 邮件服务
-      3. 创建 Admin 账号并分配权限
-      4. 配置芯片与功能
-      5. 审核首批注册用户
-      每步最多 3-4 句话，具体数值从已填充页面提取确保一致
+      从已填充的 system-init 和核心管理页面提炼
+      聚焦管理员首次登录后的核心配置操作
+      每步最多 3-4 句话
+      具体数值从已填充页面提取确保一致
 
   - path: faq.md
     sources: [synthesized]
     role: 管理员常见问题
     batch: 3
     extract_strategy: |
-      从各指南页面的边界条件和限制反向生成 FAQ，按场景分组：
-      - 用户管理：审核拒绝原因要求、禁用后能否恢复、Admin 创建的用户为何不用审核
-      - 权限分配：全量覆盖模式的影响、芯片功能组合的含义
-      - 任务管理：什么时候可以取消/重试、手动标记的使用场景
-      - 系统配置：修改过期天数是否影响已有文件、SMTP 测试失败怎么办
-      - 代操作：代操作的操作记录归属
+      从各指南页面的边界条件和限制反向生成 FAQ
+      按管理场景分组
       每个分类 3-5 个问题，总计不超过 25 个
 
   - path: index.md
@@ -234,10 +107,7 @@ pages:
     role: 管理员首页概览
     batch: 3
     extract_strategy: |
-      管理职责概览（而非功能列表），按日常工作流组织：
-      角色说明（Admin vs SuperAdmin 职责差异）
-      → 用户管理（审核 + 创建 + 权限分配）
-      → 内容管理（芯片配置 + 任务监控 + 模型文件）
-      → 系统运营（配置 + 审计 + 监控）
+      管理职责概览（而非功能列表），按日常工作流组织
+      不同管理角色的职责差异
       每个模块用 1-2 句话概述 + 链接到对应指南页
       从已填充页面提炼功能卡片描述
